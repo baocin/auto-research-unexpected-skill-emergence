@@ -1,62 +1,70 @@
 import numpy as np
 import time
 
-def run_adversarial_consensus_v4(n_agents=100, frozen_ratio=0.5, iterations=50):
+def consensus_protocol(nodes, noise_prob=0.0):
     """
-    Investigates 'Adversarial Consensus': 
-    A population where a subset of agents is 'frozen' at extreme values (0 and 1),
-    testing if the remaining free agents can reach a consensus or if the system
-    splits into polarized clusters.
+    Simulates a consensus protocol on a complete graph (broadcast).
+    Nodes attempt to reach agreement based on the observed majority.
     """
-    np.random.seed(42)
-    # Initialize agents with random values in [0, 1]
-    values = np.random.rand(n_agents)
+    n = len(nodes)
+    received_messages = []
+    for i in range(n):
+        msg = nodes[i]
+        if np.random.rand() < noise_prob:
+            msg = 1 - msg
+        received_messages.append(msg)
     
-    # Determine indices of frozen agents
-    num_frozen = int(n_agents * frozen_ratio)
-    indices = np.arange(n_agents)
-    np.random.shuffle(indices)
-    
-    frozen_indices = indices[:num_frozen]
-    free_indices = indices[num_frozen:]
-    
-    # Assign frozen agents to extreme values (half 0, half 1)
-    for i, idx in enumerate(frozen_indices):
-        values[idx] = 0.0 if i < num_frozen // 2 else 1.0
-    
-    initial_variance = np.var(values)
-    current_values = values.copy()
+    decision = 1 if np.mean(received_messages) > 0.5 else 0
+    return np.full(n, decision)
 
-    for _ in range(iterations):
-        new_values = current_values.copy()
-        # Local interaction: agents look at neighbors within a value-range window
-        # This tests if the 'free' agents can bridge the gap or get trapped by anchors
-        for i in free_indices:
-            diffs = np.abs(current_vals := current_values - current_values[i])
-            neighbors_mask = diffs < 0.3 
-            neighbors = current_values[neighbors_mask]
+def run_experiment(n_nodes_list, noise_levels, adversarial_ratio):
+    """
+    Tests how an adversarial block (fixed at 0) affects the probability 
+    of reaching a '1' consensus in a noisy broadcast environment.
+    """
+    results = []
+    for n in n_nodes_list:
+        for p in noise_levels:
+            trials = 40
+            successes_target_1 = 0
+            agreements = 0
+            start_time = time.time()
             
-            if len(neighbors) > 0:
-                target = np.mean(neighbors)
-                new_values[i] = current_values[i] + 0.5 * (target - current_values[i])
-        current_values = new_values
-
-    final_variance = np.var(current_values)
-    # Success is defined as variance reduction relative to the polarized state
-    success_metric = 1.0 - (final_variance / initial_variance) if initial_variance > 0 else 0
-    return success_metric
-
-def run_experiment():
-    print(f"experiment: adversarial_consensus_v4")
-    ratios = [0.1, 0.3, 0.5, 0.7, 0.9]
-    for r in ratios:
-        start_time = time.time()
-        try:
-            success = run_adversarial_consensus_v4(frozen_ratio=r)
+            for _ in range(trials):
+                num_adversaries = int(n * adversarial_ratio)
+                num_random = n - num_adversaries
+                
+                initial_nodes = np.concatenate([
+                    np.zeros(num_adversaries),
+                    np.random.choice([0, 1], size=num_random)
+                ])
+                np.random.shuffle(initial_nodes)
+                
+                final_states = consensus_protocol(initial_nodes, noise_prob=p)
+                
+                if np.all(final_states == final_states[0]):
+                    agreements += 1
+                
+                if np.mean(final_states) == 1.0:
+                    successes_target_1 += 1
+            
             duration = time.time() - start_time
-            print(f"frozen_ratio_{r:.1f}_success_{success:.4f}_time_{duration:.4f}")
-        except Exception as e:
-            print(f"error_at_{r}_{e}")
+            results.append({
+                'n': n,
+                'p': p,
+                'agreement_rate': agreements / trials,
+                'target_1_rate': successes_target_1 / trials,
+                'avg_time': duration / trials
+            })
+    return results
 
 if __name__ == "__main__":
-    run_experiment()
+    n_nodes_list = [10, 50, 100]
+    noise_levels = [0.0, 0.2, 0.4, 0.6]
+    adversarial_ratio = 0.5 # 50% fixed at 0
+    
+    print(f"experiment: adversarial_consensus_v4")
+    results = run_experiment(n_nodes_list, noise_levels, adversarial_ratio)
+    
+    for r in results:
+        print(f"n:{r['n']} p:{r['p']} agreement_rate:{r['agreement_rate']:.2f} target_1_rate:{r['target_1_rate']:.2f} time:{r['avg_time']:.4f}")

@@ -1,57 +1,70 @@
 import numpy as np
-import time
 
-def run_experiment():
+def generate_sensor_stream(n, noise_prob=0.0, sensor_failure_prob=0.0):
     """
-    Investigates 'Anomaly Detection with Damaged Sensors':
-    A set of sensor nodes measure a true signal (a sine wave).
-    Some sensors are 'healthy' and report the signal + small noise.
-    Some sensors are 'damaged' and report high-variance white noise.
-    We test if local median filtering can recover the signal strength.
+    Generates a stream of sensor readings (e.g., temperature).
+    Some sensors are 'damaged' and always report a fixed value (0.0).
     """
-    num_sensors = 200
-    num_damaged = 40
-    signal_freq = 0.1
+    t = np.linspace(0, 10, n)
+    signal = np.sin(t)
     
-    # 1. Create sensor positions (on a 1D line)
-    positions = np.linspace(0, 10, num_sensors)
+    # Add Gaussian noise to the signal
+    noise = np.random.normal(0, 0.1, n)
+    stream = signal + noise
     
-    # 2. True signal: sine wave
-    true_signal = np.sin(signal_freq * positions)
+    # Introduce sensor failures: some sensors are 'stuck' at 0.0
+    failure_mask = np.random.rand(n) < sensor_failure_prob
+    stream[failure_mask] = 0.0
     
-    # 3. Sensor readings
-    readings = true_signal + np.random.normal(0, 0.1, num_sensors) # Healthy noise
-    
-    # 4. Inject damage (high variance noise in random sensors)
-    damaged_indices = np.random.choice(num_sensors, num_damaged, replace=False)
-    readings[damaged_indices] += np.random.normal(0, 5.0, num_damaged)
-    
-    # 5. Local filtering algorithm: Median filter (robust to outliers/damage)
-    start_time = time.time()
-    filtered_readings = np.copy(readings)
-    window_size = 5
-    half_win = window_size // 2
-    
-    for i in range(num_sensors):
-        start_idx = max(0, i - half_win)
-        end_idx = min(num_sensors, i + half_win + 1)
-        # Median is robust to the 'damaged' outliers
-        filtered_readings[i] = np.median(readings[start_idx:end_idx])
-    
-    end_time = time.time()
-    
-    # 6. Evaluate effectiveness
-    # Success metric: Reduction in MSE (Mean Squared Error) relative to the true signal
-    initial_mse = np.mean((readings - true_signal)**2)
-    final_mse = np.mean((filtered_readings - true_signal)**2)
-    
-    success_metric = 1.0 - (final_mse / initial_mse) if initial_mse > 0 else 0
+    return stream
 
-    print(f"experiment: anomaly_damaged_sensors")
-    print(f"initial_mse: {initial_mse:.4f}")
-    print(f"final_mse: {final_mse:.4f}")
-    print(f"success_rate: {success_metric:.4f}")
-    print(f"total_seconds: {end_time - start_time:.4f}")
+def detect_anomalies_with_damage(stream, threshold=3.0):
+    """Detects anomalies (spikes) in the sensor stream using a simple z-score."""
+    detections = []
+    mu = np.mean(stream)
+    sigma = np.std(stream) + 1e-6
+    
+    for i, val in enumerate(stream):
+        z_score = abs(val - mu) / sigma
+        if z_score > threshold:
+            detections.append(i)
+    return detections
+
+def run_experiment(n_samples, noise_levels, failure_levels):
+    """
+    Tests how sensor failures affect our ability to detect signal spikes.
+    The spike magnitude decreases as damage increases.
+    """
+    results = []
+    spike_idx = n_samples // 2
+    
+    for p_noise in noise_levels:
+        for p_fail in failure_levels:
+            # The spike becomes harder to detect as damage increases
+            # We scale magnitude inversely with the total 'damage' (p_noise + p_fail)
+            spike_magnitude = 5.0 / (1.0 + p_noise + p_fail)
+            
+            stream = generate_sensor_stream(n_samples, noise_prob=p_noise, sensor_failure_prob=p_fail)
+            stream[spike_idx] += spike_magnitude 
+            
+            detections = detect_anomalies_with_damage(stream)
+            detected = spike_idx in detections
+            
+            results.append({
+                'noise': p_noise,
+                'failure': p_fail,
+                'mag': round(spike_magnitude, 2),
+                'detected': detected
+            })
+    return results
 
 if __name__ == "__main__":
-    run_experiment()
+    n_samples = 500
+    noise_levels = [0.0, 0.3, 0.6]
+    failure_levels = [0.0, 0.3, 0.6]
+    
+    print(f"experiment: anomaly_detection_sensitivity")
+    results = run_experiment(n_samples, noise_levels, failure_levels)
+    
+    for res in results:
+        print(f"noise:{res['noise']} fail:{res['failure']} mag:{res['mag']} detected:{res['detected']}")
