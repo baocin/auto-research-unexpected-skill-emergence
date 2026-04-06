@@ -1,6 +1,5 @@
-experiment: anomaly_detection_sensor_damage_v2
-damage:0.0 precision:0.5500 recall:0.5500 time:0.000624
-damage:0.2 precision:0.5160 recall:0.5160 time:0.000056
-damage:0.4 precision:0.4380 recall:0.4380 time:0.000055
-damage:0.6 precision:0.3240 recall:0.3240 time:0.000054
-damage:0.8 precision:0.1600 recall:0.1600 time:0.000054
+experiment: adversarial_consensus_v2
+failure:0.0 avg:0.5231 t:0.006202
+failure:0.1 avg:0.4965 t:0.006075
+failure:0.3 avg:0.5213 t:0.005812
+failure:0.5 avg:0.4873 t:0.004606

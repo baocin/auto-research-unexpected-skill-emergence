@@ -1,88 +1,144 @@
 import numpy as np
 import time
 
-def consensus_protocol(nodes, noise_prob=0.0):
+def run_experiment():
     """
-    Simulates a consensus protocol on a complete graph (broadcast).
-    Nodes attempt to reach agreement based on the observed majority.
+    Investigates 'Adversarial Consensus' with a dynamic topology.
+    Instead of a static small-world graph, we introduce 'edge failure' 
+    to see if the consensus can survive random disconnection.
     """
-    n = len(nodes)
-    # Each node receives all messages with potential bit-flip noise
-    received_messages = []
-    for i in range(n):
-        msg = nodes[i]
-        if np.random.rand() < noise_prob:
-            msg = 1 - msg
-        received_messages.append(msg)
-    
-    # Decision rule: majority of the received messages
-    decision = 1 if np.mean(received_messages) > 0.5 else 0
-    return np.full(n, decision)
-
-def run_experiment(n_nodes_list, noise_levels, adversarial_ratio):
-    """
-    Tests how an adversarial block (fixed at 0) affects the probability 
-    of reaching a '1' consensus in a noisy broadcast environment.
-    """
+    n_nodes = 100
+    num_trials = 5
+    iterations = 50
+    failure_rates = [0.0, 0.1, 0.3, 0.5] # Probability of an edge being broken
     results = []
-    for n in n_nodes_list:
-        for p in noise_levels:
-            trials = 30
-            successes_target_1 = 0
-            agreements = 0
-            start_time = time_time() # wait, typo in thought process
-            
-            # We'll use a cleaner loop structure below
-            pass
 
-def run_experiment_fixed(n_nodes_list, noise_levels, adversarial_ratio):
-    results = []
-    for n in n_nodes_list:
-        for p in noise_levels:
-            trials = 30
-            successes_target_1 = 0
-            agreements = 0
-            start_time = time.time()
+    for failure in failure_rates:
+        p_avg_list = []
+        t_list = []
+        
+        for _ in range(num_trials):
+            # Connectivity: Ring topology + random edges
+            adj = np.zeros((n_nodes, n_nodes))
+            for i in range(n_nodes):
+                adj[i, (i + 1) % n_nodes] = 1
+                adj[i, (i - 1) % n_nodes] = 1
+                target = np.random.randint(0, n_nodes)
+                if target != i:
+                    adj[i, target] = 1
+                    adj[target, i] = 1
+
+            # Apply edge failure (damage to the network structure)
+            mask = np.random.rand(n_nodes, n_nodes) < failure
+            adj[mask] = 0
+            # Ensure symmetry after masking
+            adj = (adj + adj.T) / 2
+            # Remove self-loops
+            np.fill_diagonal(adj, 0)
+
+            # Initialize states
+            states = np.random.rand(n_nodes)
             
-            for _ in range(trials):
-                # Setup: fixed adversaries at 0, others random
-                num_adversaries = int(n * adversarial_ratio)
-                num_random = n - num_adversaries
-                
-                initial_nodes = np.concatenate([
-                    np.zeros(num_adversaries),
-                    np.random.choice([0, 1], size=num_random)
-                ])
-                np.random.shuffle(initial_nodes)
-                
-                # Run protocol
-                final_states = consensus_protocol(initial_nodes, noise_prob=p)
-                
-                # Metric 1: Did they all agree? (In broadcast, they always do in this model)
-                if np.all(final_states == final_states[0]):
-                    agreements += 1
-                
-                # Metric 2: Did they reach the '1' state?
-                if np.mean(final_states) == 1.0:
-                    successes_target_1 += 1
+            # Define Adversarial Anchors: Half nodes fixed at 0 and 1
+            num_anchors = n_nodes // 2
+            anchor_indices = np.arange(num_anchors)
+            is_frozen = np.zeros(n_nodes, dtype=bool)
+            is_frozen[anchor_indices] = True
             
-            duration = time.time() - start_time
+            # Set anchor values: first half of anchors to 0, second half to 1
+            states[anchor_indices[:num_anchors//2]] = 0.0
+            states[anchor_indices[num_anchors//2:]] = 1.0
+
+            s_time = time.time()
+            for _ in range(iterations):
+                new_states = states.copy()
+                # Only update non-frozen nodes
+                agent_indices = np.where(~is_frozen)[0]
+                for i in agent_indices:
+                    neighbors = np.where(adj[i] == 1)[0]
+                    if len(neighbors) > 0:
+                        new_states[i] = np.mean(states[neighbors])
+                states = new_states
+
+            t_elapsed = time.time() - s_time
+            
+            # Metric: Variance of the final state (lower means better consensus)
+            final_variance = np.var(states)
+            avg_val = np.mean(states)
+            
+            p_avg_list.append(avg_val)
+            t_list.append(t_elapsed)
             results.append({
-                'n': n,
-                'p': p,
-                'agreement_rate': agreements / trials,
-                'target_1_rate': successes_target_1 / trials,
-                'avg_time': duration / trials
+                'failure': failure,
+                'variance': final_variance,
+                'avg': avg_val,
+                'time': t_elapsed
             })
-    return results
+
+        # Calculate mean for this failure rate
+        mean_p = np.mean(p_avg_list)
+        mean_t = np.mean(t_list)
+        
+        # We will print the summary later using a different format
+        # For now, we append to a global list for processing
+        pass
+
+    print("experiment: adversarial_consensus_v2")
+    # To make it easy to grep, I'll re-structure the loop output below.
+    # (Self-correction: The current structure is fine for the agent)
 
 if __name__ == "__main__":
-    n_nodes_list = [10, 50, 100]
-    noise_levels = [0.0, 0.1, 0.3]
-    adversarial_ratio = 0.4 # 40% of nodes are fixed at 0
+    # Re-running logic within the function to ensure clean printing
+    import sys
     
-    print(f"experiment: adversarial_consensus_strength")
-    results = run_experiment_fixed(n_nodes_list, noise_levels, adversarial_ratio)
-    
-    for r in results:
-        print(f"n:{r['n']} p:{r['p']} agreement_rate:{r['agreement_rate']:.2f} target_1_rate:{r['target_1_rate']:.2f} time:{r['avg_time']:.4f}")
+    # Redefining run_experiment inside main to handle printing properly
+    n_nodes = 100
+    num_trials = 5
+    iterations = 50
+    failure_rates = [0.0, 0.1, 0.3, 0.5]
+    all_data = []
+
+    for failure in failure_rates:
+        p_avgs = []
+        t_avgs = []
+        for _ in range(num_trials):
+            adj = np.zeros((n_nodes, n_nodes))
+            for i in range(n_nodes):
+                adj[i, (i + 1) % n_nodes] = 1
+                adj[i, (i - 1) % n_nodes] = 1
+                target = np.random.randint(0, n_nodes)
+                if target != i:
+                    adj[i, target] = 1
+                    adj[target, i] = 1
+
+            mask = np.random.rand(n_nodes, n_nodes) < failure
+            adj[mask] = 0
+            adj = (adj + adj.T) / 2
+            np.fill_diagonal(adj, 0)
+
+            states = np.random.rand(n_nodes)
+            num_anchors = n_nodes // 2
+            anchor_indices = np.arange(num_anchors)
+            is_frozen = np.zeros(n_nodes, dtype=bool)
+            is_frozen[anchor_indices] = True
+            states[anchor_indices[:num_anchors//2]] = 0.0
+            states[anchor_indices[num_anchors//2:]] = 1.0
+            agent_indices = np.where(~is_frozen)[0]
+
+            s_time = time.time()
+            for _ in range(iterations):
+                new_states = states.copy()
+                for i in agent_indices:
+                    neighbors = np.where(adj[i] == 1)[0]
+                    if len(neighbors) > 0:
+                        new_states[i] = np.mean(states[neighbors])
+                states = new_states
+            t_elapsed = time.time() - s_time
+            p_avgs.append(np.mean(states))
+            t_avgs.append(t_elapsed)
+        
+        all_data.append((failure, np.mean(p_avgs), np.mean(t_avgs)))
+
+    print("experiment: adversarial_consensus_v2")
+    for f, p, t in all_data:
+        print(f"failure:{f:.1f} avg:{p:.4f} t:{t:.6f}")
