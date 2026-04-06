@@ -1,0 +1,10 @@
+experiment: scaling_analysis
+N_20_R_1.0_success_0.0271_time_0.0012
+N_20_R_2.0_success_0.1365_time_0.0013
+N_20_R_5.0_success_0.9977_time_0.0013
+N_50_R_1.0_success_0.0579_time_0.0033
+N_50_R_2.0_success_0.1512_time_0.0034
+N_50_R_5.0_success_0.6041_time_0.0033
+N_100_R_1.0_success_0.0870_time_0.0071
+N_100_R_2.0_success_0.1211_time_0.0071
+N_100_R_5.0_success_0.9970_time_0.0074
