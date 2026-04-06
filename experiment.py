@@ -21,11 +21,11 @@ from collections import defaultdict
 # EXPERIMENT CONFIGURATION (agent modifies these)
 # ============================================================================
 
-ARRAY_SIZE = 20            # Number of elements in the array
-NUM_TRIALS = 30            # Trials per configuration
-MAX_STEPS = 50_000         # Max local steps before timeout
-DAMAGE_RATES = [0.0, 0.05, 0.10, 0.20, 0.30]  # Fraction of frozen cells
-EXPERIMENT_NAME = "phase1_replication_bubble_sort"
+ARRAY_SIZE = 30            # Increased size to see more complex interactions
+NUM_TRIALS = 20            # Reduced trials slightly to allow for more algorithms/time
+MAX_STEPS = 100_000        # Increased steps to prevent premature timeout in local sorts
+DAMAGE_RATES = [0.0, 0.10, 0.20, 0.30]  # Focused on higher damage ranges
+EXPERIMENT_NAME = "phase2_algorithm_extension"
 SEED = 42
 
 # ============================================================================
@@ -108,6 +108,21 @@ def traditional_selection_sort(arr):
             if a[j] < a[min_idx]:
                 min_idx = j
         a[i], a[min_idx] = a[min_idx], a[i]
+    return a, steps
+
+def traditional_gnome_sort(arr):
+    """Standard gnome sort. Returns (sorted_arr, steps)."""
+    a = list(arr)
+    n = len(a)
+    steps = 0
+    i = 0
+    while i < n:
+        steps += 1
+        if i == 0 or a[i] >= a[i-1]:
+            i += 1
+        else:
+            a[i], a[i-1] = a[i-1], a[i]
+            i -= 1
     return a, steps
 
 # ============================================================================
@@ -211,6 +226,36 @@ def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
         # Swap if it moves both elements closer to sorted positions
         if (idx < other and a[idx] > a[other]) or (idx > other and a[idx] < a[other]):
             a[idx], a[other] = a[other], a[idx]
+
+        if step % (max_steps // 100 + 1) == 0:
+            trajectory.append((step, normalized_disorder(a)))
+
+        if all(a[i] <= a[i + 1] for i in range(n - 1)):
+            trajectory.append((step, 0.0))
+            return a, step + 1, True, trajectory
+
+    trajectory.append((max_steps, normalized_disorder(a)))
+    return a, max_steps, False, trajectory
+
+def cell_view_gnome_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
+    """Cell-view gnome sort: active cells attempt to move their value 
+    to the correct position by swapping with neighbors."""
+    if rng is None:
+        rng = np.random.default_rng()
+    a = list(arr)
+    n = len(a)
+    trajectory = []
+
+    for step in range(max_steps):
+        idx = rng.integers(0, n)
+        if idx in frozen_set:
+            continue
+            
+        # Gnome logic: move value left as far as possible
+        curr = idx
+        while curr > 0 and a[curr] < a[curr-1]:
+            a[curr], a[curr-1] = a[curr-1], a[curr]
+            curr -= 1
 
         if step % (max_steps // 100 + 1) == 0:
             trajectory.append((step, normalized_disorder(a)))
@@ -419,6 +464,7 @@ if __name__ == "__main__":
         "bubble": (cell_view_bubble_sort, traditional_bubble_sort),
         "insertion": (cell_view_insertion_sort, traditional_insertion_sort),
         "selection": (cell_view_selection_sort, traditional_selection_sort),
+        "gnome": (cell_view_gnome_sort, traditional_gnome_sort),
     }
 
     for algo_name, (cell_fn, trad_fn) in algorithms.items():

@@ -152,3 +152,395 @@ The `selection` sort is doing much better, likely because it has a more global s
 However, I noticed something in my `cell_view_...
 
 [EXECUTING 1 action(s)]
+
+[RESULTS]
+[COMMIT: Fix frozen cell deadlock by allowing active cells to check both neighbors]
+[research/apr6 8f10fcc] Fix frozen cell deadlock by allowing active cells to check both neighbors
+ 6 files changed, 615 insertions(+), 248 deletions(-)
+ create mode 100644 .claude/scheduled_tasks.lock
+ create mode 100644 agent_output.log
+ create mode 100644 run.log
+
+========================================
+ITERATION 6
+========================================
+
+[AGENT RESPONSE]
+The experiment results show that the fix was successful: we have moved from a $0\%$ success rate across all damaged configurations to non-zero success rates even at $30\%$ damage. The `selection` sort is significantly more robust ($26.7\%$), which is expected due to its global interaction capability, while `bubble` and `insertion` are much more sensitive to local blockages.
+
+I will now perform a more thorough analysis by running the experiment for all damage rates in the configuration and then check if we can improve the performance of the local algorithms by increasing `MAX_STEPS`. 
+
+First, I'll run the current configuration one more time to get a clean log of all damage rates.
+
+<action type="shell">python3 experiment.py > run_full_analysis.log 2>&1</action>...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[SHELL: python3 experiment.py > run_full_analysis.log 2>&1]
+
+
+========================================
+ITERATION 7
+========================================
+
+[AGENT RESPONSE]
+I will now inspect the full analysis log to observe how success rates decay with increasing damage across all algorithms and damage rates.
+
+<action type="shell">grep "^success_rate\|^experiment:\|^total_seconds:" run_full_analysis.log</action>...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[SHELL: grep "^success_rate\|^experiment:\|^total_seconds:" run_full_analysis.log]
+experiment:       phase1_replication_bubble_sort
+total_seconds:    25.7
+success_rate_bubble_dmg0.3: 0.0333
+success_rate_insertion_dmg0.3: 0.0000
+success_rate_selection_dmg0.3: 0.2667
+
+========================================
+ITERATION 8
+========================================
+
+[AGENT RESPONSE]
+The results for `dmg0.3` are consistent, but the log only shows the summary for the highest damage rate because of how I used `grep`. I need to see the full output of the experiment to understand the decay curve (how it performs at $0.0$, $0.05$, etc.).
+
+<action type="shell">grep -E "damage=|success_rate_|mean_steps|mean_disorder" run_full_analysis.log</action>...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[SHELL: grep -E "damage=|success_rate_|mean_steps|mean_disorder" run_full_analysis.log]
+damage=0.0: success_rate=1.00, mean_steps=208, mean_disorder=0.0000
+  damage=0.05: success_rate=1.00, mean_steps=218, mean_disorder=0.0000
+  damage=0.1: success_rate=0.97, mean_steps=1897, mean_disorder=0.0033
+  damage=0.2: success_rate=0.57, mean_steps=21831, mean_disorder=0.0863
+  damage=0.3: success_rate=0.03, mean_steps=48342, mean_disorder=0.2170
+  damage=0.0: success_rate=1.00, mean_steps=452, mean_disorder=0.0000
+  damage=0.05: success_rate=0.00, mean_steps=50000, mean_disorder=0.1619
+  damage=0.1: success_rate=0.00, mean_steps=50000, mean_disorder=0.2670
+  damage=0.2: success_rate=0.00, mean_steps=50000, mean_disorder=0.3695
+  damage=0.3: success_rate=0.00, mean_steps=50000, mean_disorder=0.4039
+  damage=0.0: success_rate=1.00, mean_steps=850, mean_disorder=0.0000
+  damage=0.05: success_rate=1.00, mean_steps=928, mean_disorder=0.0000
+  damage=0.1: success_rate=1.00, mean_steps=916, mean_disorder=0.0000
+  damage=0.2: success_rate=0.80, mean_steps=10933, mean_disorder=0.0014
+  damage=0.3: success_rate=0.27, mean_steps=36985, mean_disorder=0.0061
+    damage=0.0: success_rate=0.00, mean_steps=50000, peak_clustering=0.5053
+    damage=0.05: success_rate=0.00, mean_steps=50000, peak_clustering=0.5193
+    damage=0.1: success_rate=0.00, mean_steps=50000, peak_clustering=0.5456
+    damage=0.2: success_rate=0.00, mean_steps=50000, peak_clustering=0.5175
+    damage=0.3: success_rate=0.00, mean_steps=50000, peak_clustering=0.5053
+    damage=0.0: success_rate=1.00, mean_steps=1016, peak_clustering=0.5737
+    damage=0.05: success_rate=0.67, mean_steps=17411, peak_clustering=0.5561
+    damage=0.1: success_rate=0.43, mean_steps=28897, peak_clustering=0.5544
+    damage=0.2: success_rate=0.13, mean_steps=43596, peak_clustering=0.5667
+    damage=0.3: success_rate=0.00, mean_steps=50000, peak_clustering=0.5246
+    damage=0.0: success_rate=1.00, mean_steps=1034, peak_clustering=0.5772
+    dama
+
+========================================
+ITERATION 9
+========================================
+
+[AGENT RESPONSE]
+The analysis of the results is very revealing. We can see a clear phase transition in robustness as damage increases:
+
+1.  **Bubble Sort**: Shows an exponential-like decay. It maintains $100\%$ success at low damage ($0.0, 0.05$) but collapses to $3.3\%$ at $30\%$ damage. The `mean_steps` also explodes from $\approx 200$ to $\approx 48,000$, indicating that as more cells freeze, the "path" for elements becomes extremely convoluted, requiring many more random activations to find a way around the frozen barriers.
+2.  **Insertion Sort**: This is the most fragile. It completely fails at $5\%$ damage and above in this specific run. This suggests that even a single frozen cell can create a "bottleneck" that the local insertion logic cannot overcome within `MAX_STEPS`.
+3.  **Selection Sort**: The...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[EDITED: /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py (replaced 517 chars with 592 chars)]
+
+========================================
+ITERATION 10
+========================================
+
+[AGENT RESPONSE]
+I will now implement the new algorithms: **Cocktail Shaker Sort** (a bidirectional bubble sort) and **Gnome Sort** (which uses a single pointer that moves back and forth). These are also local-viewable and could potentially show different robustness profiles.
+
+After implementing these, I'll run the expanded experiment suite.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
+    """Cell-view selection sort: each element compares with a random other element
+    and swaps if it would move closer to correct position.
+    Returns (final_arr, steps_taken, sorted_successfully, trajectory)."""
+    if rng is None:
+        rng = np.random.default_rng()
+    a = list(arr)
+    n = len(a)
+    trajectory = []
+
+    for step...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[EDIT FAILED: old_text not found in /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py. Closest match to first line: 'def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):']
+
+========================================
+ITERATION 11
+========================================
+
+[AGENT RESPONSE]
+I made a mistake in the `OLD` block by including some extra text and a typo (`final->final_arr`). I will now try a cleaner replacement of just the `cell_view_selection_sort` function, followed by adding `gnome_sort`.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
+    """Cell-view selection sort: each element compares with a random other element
+    and swaps if it would move closer to correct position.
+    Returns (final_arr, steps_taken, sorted_successfully, trajectory)."""
+    if rng is None:
+        rng = np.random.default_rng()
+    a = list(arr)
+    n = len(a)
+    trajectory = []
+
+    for step in range(max_steps):
+        idx = rng.integers(0, n)
+
+        if idx in frozen_set:
+            continue
+
+  ...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[EDIT FAILED: old_text not found in /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py. Closest match to first line: 'def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):']
+
+========================================
+ITERATION 12
+========================================
+
+[AGENT RESPONSE]
+The edit failed because of a mismatch in the docstring or whitespace. I will use a much smaller and more certain `OLD` block to replace only the core logic of `cell_view_selection_sort`, and then I will add `gnome_sort`.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+        if (idx < other and a[idx] > a[other]) or (idx > other and a[idx] < a[perm_idx]):
+            a[idx], a[other] = a[other], a[idx]
+===
+        if (idx < other and a[idx] > a[other]) or (idx > other and a[idx] < a[other]):
+            a[idx], a[other] = a[other], a[idx]
+>>>NEW
+</action>
+
+Wait, I see that in my previous attempt, I tried to fix something that might not have been broken in the way I thought. Let me check the actual content of `cell_view_selection_sort` again.
+
+<action type="read_file">experiment.py<...
+
+[EXECUTING 2 action(s)]
+
+[RESULTS]
+[READ experiment.py]
+"""
+Emergent Competencies in Locally-Executed Algorithms
+=====================================================
+Core experiment framework. The agent modifies THIS file to run experiments.
+
+Based on Levin et al. (2025) "Classical Sorting Algorithms as a Model of Morphogenesis"
+
+Each experiment:
+1. Defines algorithm(s) in cell-view (local execution) and traditional (top-down) form
+2. Runs trials with varying damage rates
+3. Measures robustness metrics
+4. Outputs results to stdout in a parseable format
+"""
+
+import numpy as np
+import time
+import json
+from collections import defaultdict
+
+# ============================================================================
+# EXPERIMENT CONFIGURATION (agent modifies these)
+# ============================================================================
+
+ARRAY_SIZE = 30            # Increased size to see more complex interactions
+NUM_TRIALS = 20            # Reduced trials slightly to allow for more algorithms/time
+MAX_STEPS = 100_000        # Increased steps to prevent premature timeout in local sorts
+DAMAGE_RATES = [0.0, 0.10, 0.20, 0.30]  # Focused on higher damage ranges
+EXPERIMENT_NAME = "phase2_algorithm_extension"
+SEED = 42
+
+# ============================================================================
+# METRICS
+# ============================================================================
+
+def sortedness_ratio(arr):
+    """Fraction of elements in correct sorted position (0.0 to 1.0)."""
+    sorted_arr = sorted(arr)
+    return sum(1 for a, b in zip(arr, sorted_arr) if a == b) / len(arr)
+
+def inversions(arr):
+    """Count number of inversions (pairs out of order)."""
+    count = 0
+    for i in range(len(arr)):
+        for j in range(i + 1, len(arr)):
+            if arr[i] > arr[j]:
+                count += 1
+    return count
+
+def max_inversions(n):
+    """Maximum possible inversions for array of size n."""
+    return n * (n - 1) // 2
+
+def normalized_disorder(arr):
+    """Inversions / max_inversions. 0.0 = s
+
+========================================
+ITERATION 13
+========================================
+
+[AGENT RESPONSE]
+I have reviewed the file content. The error in my previous `edit_file` was due to trying to replace a block that contained a slight mismatch with what was actually in the file (the `idx < other...` line). 
+
+The current state of `experiment.py` already contains the correct logic for `cell_view_selection_sort` (I can see it in the `read_file` output). However, I still want to add `gnome_sort` and update the experiment configuration to include more algorithms in the next phase.
+
+Since `selection_sort` is already correct, I will now perform a clean addition of `cell_view_gnome_sort` at the end of the `CELL-VIEW` section and then update the `algorithms` dictionary to include it.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+    trajectory.append((max_steps, normalized_disorder(a)))
+   ...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[EDITED: /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py (replaced 181 chars with 1190 chars)]
+
+========================================
+ITERATION 14
+========================================
+
+[AGENT RESPONSE]
+Now that I have added `cell_view_gnome_sort`, I need to update the `CELL_VIEW_ALGORITHMS` dictionary and the main experiment loop so that Gnome sort is actually included in the experiments. I will also add its traditional counterpart (a simple gnome sort) to keep the comparison consistent.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+def traditional_selection_sort(arr):
+    """Standard selection sort. Returns (sorted_arr, steps)."""
+    a = list(arr)
+    n = len(a)
+    steps = 0
+    for i in range(n):
+        min_idx = i
+        for j in range(i + 1, n):
+            steps += 1
+            if a[j] < a[min_idx]:
+                min_idx = j
+        a[i], a[min_idx] = a[min_idx], a[i]
+    return a, steps
+
+# ============================================================================
+...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[EDITED: /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py (replaced 453 chars with 789 chars)]
+
+========================================
+ITERATION 15
+========================================
+
+[AGENT RESPONSE]
+I have now added the `traditional_gnome_sort` and `cell_view_gnome_sort`. The final step in this phase is to update the `algorithms` dictionary in the `__main__` block so that the experiment actually runs Gnome sort alongside Bubble, Insertion, and Selection.
+
+<action type="edit_file" path="experiment.py">
+<<<OLD
+    algorithms = {
+        "bubble": (cell_view_bubble_sort, traditional_bubble_sort),
+        "insertion": (cell_view_insertion_sort, traditional_insertion_sort),
+        "selection": (cell_view_selection_sort, traditional_selection_sort),
+    }
+===
+    algorithms = {
+        "bubble": (cell_view_bubble_sort, traditional_bubble_sort),
+        "insertion": (arr, cell_view_insertion_sort, traditional_insertion_sort), # Wait, I see a potential error in my logic. Let me check the dic...
+
+[EXECUTING 2 action(s)]
+
+[RESULTS]
+[EDITED: /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py (replaced 246 chars with 394 chars)]
+
+[EDITED: /Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiment.py (replaced 394 chars with 311 chars)]
+
+========================================
+ITERATION 16
+========================================
+
+[AGENT RESPONSE]
+The experiment configuration and algorithm suite are now fully extended. I have added Gnome Sort, fixed the potential deadlock in Bubble and Insertion sorts by allowing active cells to check both neighbors, and corrected the dictionary structure for the experiment runner.
+
+I will now run the complete expanded experiment to compare the robustness of these four algorithms (Bubble, Insertion, Selection, and Gnome) across different damage rates.
+
+<action type="shell">python3 experiment.py > run_extended_algorithms.log 2>&1</action>...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[SHELL: python3 experiment.py > run_extended_algorithms.log 2>&1]
+
+
+========================================
+ITERATION 17
+========================================
+
+[AGENT RESPONSE]
+I will now analyze the results of the extended algorithm experiment to evaluate the robustness of Gnome sort and compare it with the existing algorithms.
+
+<action type="shell">grep -E "damage=|success_rate_|mean_steps|mean_disorder" run_extended_algorithms.log</action>...
+
+[EXECUTING 1 action(s)]
+
+[RESULTS]
+[SHELL: grep -E "damage=|success_rate_|mean_steps|mean_disorder" run_extended_algorithms.log]
+damage=0.0: success_rate=1.00, mean_steps=439, mean_disorder=0.0000
+  damage=0.1: success_rate=0.95, mean_steps=5543, mean_disorder=0.0077
+  damage=0.2: success_rate=0.20, mean_steps=80120, mean_disorder=0.2063
+  damage=0.3: success_rate=0.00, mean_steps=100000, mean_disorder=0.2048
+  damage=0.0: success_rate=1.00, mean_steps=1025, mean_disorder=0.0000
+  damage=0.1: success_rate=0.00, mean_steps=100000, mean_disorder=0.3182
+  damage=0.2: success_rate=0.00, mean_steps=100000, mean_disorder=0.4185
+  damage=0.3: success_rate=0.00, mean_steps=100000, mean_disorder=0.4318
+  damage=0.0: success_rate=1.00, mean_steps=2232, mean_disorder=0.0000
+  damage=0.1: success_rate=0.95, mean_steps=7243, mean_disorder=0.0001
+  damage=0.2: success_rate=0.45, mean_steps=56309, mean_disorder=0.0014
+  damage=0.3: success_rate=0.35, mean_steps=66392, mean_disorder=0.0029
+  damage=0.0: success_rate=1.00, mean_steps=594, mean_disorder=0.0000
+  damage=0.1: success_rate=0.15, mean_steps=85080, mean_disorder=0.1113
+  damage=0.2: success_rate=0.05, mean_steps=95017, mean_disorder=0.2372
+  damage=0.3: success_rate=0.00, mean_steps=100000, mean_disorder=0.2386
+    damage=0.0: success_rate=0.00, mean_steps=100000, peak_clustering=0.5397
+    damage=0.1: success_rate=0.00, mean_steps=100000, peak_clustering=0.5483
+    damage=0.2: success_rate=0.00, mean_steps=100000, peak_clustering=0.5293
+    damage=0.3: success_rate=0.00, mean_steps=100000, peak_clustering=0.5241
+    damage=0.0: success_rate=1.00, mean_steps=2692, peak_clustering=0.5655
+    damage=0.1: success_rate=0.10, mean_steps=90274, peak_clustering=0.5328
+    damage=0.2: success_rate=0.00, mean_steps=100000, peak_clustering=0.5448
+    damage=0.3: success_rate=0.00, mean_steps=100000, peak_clustering=0.5466
+    damage=0.0: success_rate=1.00, mean_steps=2281, peak_clustering=0.5552
+    damage=0.1: success_rate=0.25, mean_steps=75905, peak_clustering=0.
+
+========================================
+ITERATION 18
+========================================
+
+[AGENT RESPONSE]
+The results of the extended algorithm experiment provide a clear hierarchy of robustness in the face of high damage (node freezing).
+
+### **Key Findings:**
+1.  **Selection Sort remains the most robust ($35\%$ success at $0.3$ damage).** Its ability to perform non-local swaps allows it to bypass frozen cells, effectively "jumping" over the gaps that block local algorithms.
+2.  **Bubble and Insertion are highly fragile.** They show a rapid decay in performance as damage increases, dropping to near zero by $0.2$ or $0.3$ damage. Their reliance on adjacent swaps makes them susceptible to being blocked by any single frozen cell that is part of an inversion path.
+3.  **Gnome Sort performs poorly under high damage.** Despite its "back-and-forth" nature, it relies heavily on a sequential traversal...
+
+[EXECUTING 1 action(s)]
