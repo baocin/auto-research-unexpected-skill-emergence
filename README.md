@@ -158,3 +158,43 @@ Intervened 3 times overnight to redirect the agent when it got stuck summarizing
 - Levin, M. (2025). ["Algorithms Redux: finding unexpected properties in truly minimal systems."](https://thoughtforms.life/algorithms-redux-finding-unexpected-properties-in-truly-minimal-systems/)
 - Original code: [github.com/Zhangtaining/sorting_with_noise](https://github.com/Zhangtaining/sorting_with_noise)
 - Karpathy, A. (2026). [autoresearch](https://github.com/karpathy/autoresearch)
+
+## Cost Analysis
+
+Two models ran concurrently overnight: Claude Opus 4.6 (cloud API, monitoring) and Gemma 4 26B (local, autonomous research). Combined they processed ~79.7M tokens.
+
+### Token Usage During Test Window (00:55 - 08:08)
+
+| | Claude (Opus 4.6) | Gemma (26B Q4_K_M) |
+|---|---|---|
+| **API calls** | 290 | 747 |
+| **Prompt tokens** | 53,318,759 | 25,884,858 |
+| **Completion tokens** | 38,569 | 454,109 |
+| **Total tokens** | **53,357,328** | **26,338,967** |
+| **Role** | Monitor (cron every 7 min) | Autonomous researcher |
+
+Claude's large prompt count is almost entirely cache reads from the cron monitor re-sending the conversation context. Gemma did 12x more actual generation (all the experiment code and reasoning).
+
+### Cost Scenarios
+
+| Scenario | Cost | Notes |
+|----------|------|-------|
+| **What we actually did** (Claude monitor + local Gemma) | **$28.27** | $26.21 was Claude cache reads from cron monitoring |
+| All Claude Opus 4.6 API (with caching) | $65.83 | If Claude did both monitoring and research |
+| All Claude Opus 4.6 API (no caching) | $404.73 | Worst case, no prompt caching |
+| All Gemma via [OpenRouter](https://openrouter.ai/google/gemma-4-26b-a4b-it) | $10.40 | At $0.13/$0.40 per 1M input/output |
+| Gemma research only via OpenRouter | $3.55 | Just the 747 experiment requests |
+| **All local Gemma (no Claude)** | **~$0.02** | Electricity only (M4 Pro ~15W for 7h) |
+| Claude Code Max 5x subscription | $100/mo | Flat rate, one night is a fraction |
+
+### Pricing Used
+
+| Model | Input | Cached Input | Output | Source |
+|-------|-------|-------------|--------|--------|
+| Claude Opus 4.6 | $5.00/1M | $0.50/1M | $25.00/1M | [Anthropic](https://platform.claude.com/docs/en/about-claude/pricing) |
+| Gemma 4 26B (OpenRouter) | $0.13/1M | n/a | $0.40/1M | [OpenRouter](https://openrouter.ai/google/gemma-4-26b-a4b-it) |
+| Gemma 4 26B (local LM Studio) | $0 | $0 | $0 | Your own hardware |
+
+### Takeaway
+
+The actual research (189 experiments, 454K tokens of generated code) was free on local hardware or $3.55 on OpenRouter. The $28 cost came almost entirely from Claude's cron monitoring re-sending conversation context every 7 minutes. For regular use, local Gemma running autonomously with manual morning check-ins would be the most cost-effective approach.
