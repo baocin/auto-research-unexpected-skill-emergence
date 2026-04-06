@@ -122,15 +122,60 @@ We extend the findings by:
 - Demonstrating the pattern extends beyond sorting to search tasks
 - Finding that stochasticity is a robustness mechanism
 
-## 7. Next Steps
+## 7. Phase 4 Results: Distributed Consensus
 
-- Test more non-sorting algorithms: consensus, distributed graph algorithms, clustering
-- Investigate detour behavior (temporarily increasing disorder to navigate around damage)
-- Characterize the phase transition more precisely (at what damage rate does each algorithm collapse?)
-- Test with different damage models (noisy execution vs. frozen, adversarial damage)
-- Scale to larger arrays to test whether findings hold
+### 7.1 Experiment Design
+A ring of N=50 nodes, each holding a binary value (0 or 1). On each step, a random active node adopts the majority value among itself and its two neighbors. Frozen nodes are fixed to value 1 (acting as "anchors"). Optional noise flips the decision with probability 0.05.
 
-## 8. References
+### 7.2 Results: Damage HELPS Consensus
+
+| Damage Rate | Agreement (fraction at value 1) |
+|-------------|--------------------------------|
+| 0% | 0.498 (random) |
+| 10% | 0.617 |
+| 20% | 0.678 |
+| 30% | 0.760 |
+| 40% | 0.824 |
+| 50% | 0.899 |
+| 60% | 0.926 |
+
+**This is the opposite of sorting.** In sorting, frozen cells are obstacles that hinder the algorithm. In consensus, frozen cells are anchors that *drive* the system toward agreement. Agreement monotonically increases with damage rate.
+
+### 7.3 Interpretation: Context-Dependent Role of Damage
+
+The frozen nodes exert a persistent directional pressure. In a system that would otherwise wander randomly (majority voting on random initial conditions converges to ~50/50), the frozen anchors provide a "gravitational pull" toward their value. More anchors = stronger pull = faster/higher agreement.
+
+This reveals that **the effect of "damage" depends on alignment between the frozen state and the task goal:**
+- In sorting: frozen cells are randomly placed and hold random values → they're obstacles
+- In consensus: frozen cells hold a consistent value → they're helpful anchors
+- This suggests a deeper principle: damage that is *structured* (consistent) can be constructive, while *random* damage is destructive
+
+### 7.4 Noise Interaction
+Adding 5% noise slightly reduces agreement at low damage but actually marginally *increases* it at high damage (0.836 vs 0.833 at 40%). The noise helps explore past local minima, similar to the random walk vs. gradient finding in Phase 3.
+
+## 8. Emerging Theory: A Taxonomy of Damage Effects
+
+| Domain | Damage Effect | Why |
+|--------|--------------|-----|
+| **Sorting** | Destructive | Frozen cells block information flow between neighbors |
+| **Search** | Partially destructive | Frozen cells block paths but stochastic agents can route around |
+| **Consensus** | **Constructive** | Frozen cells act as persistent anchors toward a consistent state |
+
+**Key insight:** The effect of structural damage depends on three factors:
+1. **Interaction range** of the algorithm (local vs. non-local)
+2. **Alignment** between frozen state and task goal (random vs. structured)
+3. **Stochasticity** of the active agents (deterministic agents get trapped; random ones explore)
+
+## 9. Next Steps
+
+- Test consensus with adversarial frozen nodes (half frozen at 0, half at 1) - does it still converge?
+- Implement distributed anomaly detection: can local agents identify outliers despite damage?
+- K-means with autonomous points: do damaged points create or disrupt clusters?
+- Explore the "damage alignment" hypothesis: does deliberately structured damage always help?
+- Phase transition analysis: find exact damage thresholds for each algorithm
+- Scale to 2D grids (not just 1D arrays/rings)
+
+## 10. References
 
 - Zhang, T., Goldstein, A., & Levin, M. (2025). "Classical Sorting Algorithms as a Model of Morphogenesis." *Adaptive Behavior*, 33(1). [arXiv:2401.05375](https://arxiv.org/abs/2401.05375)
 - Code: [github.com/Zhangtaining/sorting_with_noise](https://github.com/Zhangtaining/sorting_with_noise)
