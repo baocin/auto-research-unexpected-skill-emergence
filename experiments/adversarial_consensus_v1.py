@@ -1,14 +1,14 @@
 import numpy as np
 import time
 
-def run_adversarial_consensus_v2(n_agents=100, frozen_ratio=0.5, iterations=50):
+def run_adversarial_consensus(n_agents=100, frozen_ratio=0.5, iterations=50):
     """
     Investigates 'Adversarial Consensus': 
     A population where a subset of agents is 'frozen' at extreme values (0 and 1),
     testing if the remaining free agents can reach a consensus or if the system
     splits into polarized clusters.
     """
-    np.random.seed(42)
+    np.random.seed(42) # Using fixed seed for reproducibility
     # Initialize agents with random values in [0, 1]
     values = np.random.rand(n_agents)
     
@@ -29,26 +29,28 @@ def run_adversarial_consensus_v2(n_agents=100, frozen_ratio=0.5, iterations=50):
 
     for _ in range(iterations):
         new_values = current_values.copy()
-        # Free agents update based on the global mean (simulating full connectivity/global info)
-        # To test 'local' robustness, we use a windowed approach if possible, 
-        # but here we check the impact of the fixed anchors on the global attractor.
-        target = np.mean(current_values)
+        # Free agents update based on local average (all-to-all for simplicity in this test)
+        # but we simulate 'local' by only looking at a window if we wanted. 
+        # Here we use global mean to check the pull of the anchors.
         for i in free_indices:
+            # Local interaction simulation: average of neighbors (simulated as all agents)
+            target = np.mean(current_values)
             new_values[i] = current_values[i] + 0.5 * (target - current_values[i])
         current_values = new_values
 
     final_variance = np.var(current_values)
-    # Success is defined as variance reduction relative to the polarized state
+    # Success is defined as the system NOT splitting into two extreme poles
+    # i.e., variance reduction relative to the initial polarized state
     success_metric = 1.0 - (final_variance / initial_variance) if initial_variance > 0 else 0
     return success_metric
 
 def run_experiment():
-    print(f"experiment: adversarial_consensus_v2")
+    print(f"experiment: adversarial_consensus_v1")
     ratios = [0.1, 0.3, 0.5, 0.7, 0.9]
     for r in ratios:
         start_time = time.time()
         try:
-            success = run_adversarial_consensus_v2(frozen_ratio=r)
+            success = run_adversarial_consensus(frozen_ratio=r)
             duration = time.time() - start_time
             print(f"frozen_ratio_{r:.1f}_success_{success:.4f}_time_{duration:.4f}")
         except Exception as e:

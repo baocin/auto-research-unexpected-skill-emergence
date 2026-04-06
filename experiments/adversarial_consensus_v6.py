@@ -1,7 +1,7 @@
 import numpy as np
 import time
 
-def run_adversarial_consensus_v2(n_agents=100, frozen_ratio=0.5, iterations=50):
+def run_adversarial_consensus_v6(n_agents=100, frozen_ratio=0.5, iterations=50):
     """
     Investigates 'Adversarial Consensus': 
     A population where a subset of agents is 'frozen' at extreme values (0 and 1),
@@ -29,12 +29,15 @@ def run_adversarial_consensus_v2(n_agents=100, frozen_ratio=0.5, iterations=50):
 
     for _ in range(iterations):
         new_values = current_values.copy()
-        # Free agents update based on the global mean (simulating full connectivity/global info)
-        # To test 'local' robustness, we use a windowed approach if possible, 
-        # but here we check the impact of the fixed anchors on the global attractor.
-        target = np.mean(current_values)
+        # Local interaction: agents look at neighbors within a value-range window
         for i in free_indices:
-            new_values[i] = current_values[i] + 0.5 * (target - current_values[i])
+            diffs = np.abs(current_values - current_values[i])
+            neighbors_mask = diffs < 0.3 
+            neighbors = current_values[neighbors_mask]
+            
+            if len(neighbors) > 0:
+                target = np.mean(neighbors)
+                new_values[i] = current_values[i] + 0.5 * (target - current_values[i])
         current_values = new_values
 
     final_variance = np.var(current_values)
@@ -43,12 +46,12 @@ def run_adversarial_consensus_v2(n_agents=100, frozen_ratio=0.5, iterations=50):
     return success_metric
 
 def run_experiment():
-    print(f"experiment: adversarial_consensus_v2")
+    print(f"experiment: adversarial_consensus_v6")
     ratios = [0.1, 0.3, 0.5, 0.7, 0.9]
     for r in ratios:
         start_time = time.time()
         try:
-            success = run_adversarial_consensus_v2(frozen_ratio=r)
+            success = run_adversarial_consensus_v6(frozen_ratio=r)
             duration = time.time() - start_time
             print(f"frozen_ratio_{r:.1f}_success_{success:.4f}_time_{duration:.4f}")
         except Exception as e:
