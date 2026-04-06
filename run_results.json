@@ -1,0 +1,311 @@
+{
+  "single": {
+    "bubble": {
+      "algorithm": "bubble",
+      "array_size": 100,
+      "num_trials": 50,
+      "max_steps": 20000,
+      "damage_rates": {
+        "0.0": {
+          "cell_view": {
+            "success_rate": 1.0,
+            "mean_steps": 11061.9,
+            "std_steps": 828.6647874744044,
+            "mean_final_disorder": 0.0
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.05": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.378909090909091
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.1": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.4258262626262626
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.2": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.4784929292929293
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.3": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.48891313131313135
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        }
+      }
+    },
+    "insertion": {
+      "algorithm": "insertion",
+      "array_size": 100,
+      "num_trials": 50,
+      "max_steps": 20000,
+      "damage_rates": {
+        "0.0": {
+          "cell_view": {
+            "success_rate": 1.0,
+            "mean_steps": 11061.9,
+            "std_steps": 828.6647874744044,
+            "mean_final_disorder": 0.0
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 2580.5
+          }
+        },
+        "0.05": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.378909090909091
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 2571.1
+          }
+        },
+        "0.1": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.4258262626262626
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 2579.26
+          }
+        },
+        "0.2": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.4784929292929293
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 2608.18
+          }
+        },
+        "0.3": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.48891313131313135
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 2592.26
+          }
+        }
+      }
+    },
+    "selection": {
+      "algorithm": "selection",
+      "array_size": 100,
+      "num_trials": 50,
+      "max_steps": 20000,
+      "damage_rates": {
+        "0.0": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.0006505050505050503
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.05": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.03223030303030303
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.1": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.0666949494949495
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.2": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.1290989898989899
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        },
+        "0.3": {
+          "cell_view": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "std_steps": 0.0,
+            "mean_final_disorder": 0.1902707070707071
+          },
+          "traditional": {
+            "success_rate": 1.0,
+            "mean_steps": 4950.0
+          }
+        }
+      }
+    }
+  },
+  "chimeric": {
+    "chimeric_experiments": [
+      {
+        "algorithms": [
+          "bubble",
+          "insertion"
+        ],
+        "damage_rates": {
+          "0.0": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5292929292929293
+          },
+          "0.05": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5301010101010102
+          },
+          "0.1": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5373737373737374
+          },
+          "0.2": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5218181818181818
+          },
+          "0.3": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5115151515151516
+          }
+        }
+      },
+      {
+        "algorithms": [
+          "bubble",
+          "selection"
+        ],
+        "damage_rates": {
+          "0.0": {
+            "success_rate": 0.02,
+            "mean_steps": 19988.12,
+            "mean_peak_clustering": 0.5925252525252525
+          },
+          "0.05": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5969696969696969
+          },
+          "0.1": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.601010101010101
+          },
+          "0.2": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5894949494949494
+          },
+          "0.3": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5789898989898989
+          }
+        }
+      },
+      {
+        "algorithms": [
+          "insertion",
+          "selection"
+        ],
+        "damage_rates": {
+          "0.0": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5953535353535353
+          },
+          "0.05": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5858585858585857
+          },
+          "0.1": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5921212121212122
+          },
+          "0.2": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.5947474747474747
+          },
+          "0.3": {
+            "success_rate": 0.0,
+            "mean_steps": 20000.0,
+            "mean_peak_clustering": 0.58
+          }
+        }
+      }
+    ]
+  }
+}

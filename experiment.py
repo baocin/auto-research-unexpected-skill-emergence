@@ -21,9 +21,9 @@ from collections import defaultdict
 # EXPERIMENT CONFIGURATION (agent modifies these)
 # ============================================================================
 
-ARRAY_SIZE = 100           # Number of elements in the array
+ARRAY_SIZE = 50            # Number of elements in the array
 NUM_TRIALS = 50            # Trials per configuration
-MAX_STEPS = 20_000         # Max local steps before timeout
+MAX_STEPS = 100_000        # Max local steps before timeout
 DAMAGE_RATES = [0.0, 0.05, 0.10, 0.20, 0.30]  # Fraction of frozen cells
 EXPERIMENT_NAME = "phase1_replication_bubble_sort"
 SEED = 42
@@ -118,6 +118,7 @@ def traditional_selection_sort(arr):
 
 def cell_view_bubble_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
     """Cell-view bubble sort: each element compares with right neighbor and swaps if needed.
+    Frozen cells cannot execute their policy, but active cells CAN swap with frozen neighbors.
     Returns (final_arr, steps_taken, sorted_successfully, trajectory)."""
     if rng is None:
         rng = np.random.default_rng()
@@ -129,8 +130,8 @@ def cell_view_bubble_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
         # Pick a random element
         idx = rng.integers(0, n - 1)  # exclude last (no right neighbor)
 
-        # Frozen cells do nothing
-        if idx in frozen_set or (idx + 1) in frozen_set:
+        # Frozen cells do nothing (but others CAN swap with them)
+        if idx in frozen_set:
             continue
 
         # Local policy: compare with right neighbor, swap if out of order
