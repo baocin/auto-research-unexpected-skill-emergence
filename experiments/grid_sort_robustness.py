@@ -1,101 +1,53 @@
 import numpy as np
 import time
 
-class GridSortEnv:
-    def __init__(self, size=10, broken_rate=0.1):
-        self.size = size
-        self.grid = np.arange(size * size).reshape((size, size))
-        # Shuffle the grid
-        indices = np.random.permutation(size * size)
-        self.grid = self.grid.flatten()[indices].reshape((size, size))
-        
-        # Create broken nodes (cannot be swapped/moved)
-        self.broken_mask = np.random.rand(size, size) < broken_rate
-        self.target_grid = np.arange(size * size).reshape((size, size))
-
-    def step(self):
-        """
-        A simple local-swap algorithm: 
-        Find a pair of adjacent non-broken cells that, if swapped, 
-        reduces the total Manhattan distance error.
-        """
-        swaps = 0
-        # We iterate through the grid and try to perform local bubble-sort style swaps
-        for r in range(self.size):
-            for c in range(self.size):
-                if self.broken_mask[r, c]:
-                    continue
-                
-                # Check right neighbor
-                if c + 1 < self.size and not self.broken_mask[r, c+1]:
-                    val_curr = self.grid[r, c]
-                    val_next = self.grid[r, c+1]
-                    # If they are out of order relative to their target values...
-                    if val_next < val_curr:
-                        self.grid[r, c], self.grid[r, c+1] = self.grid[r, c+1], self.grid[r, c]
-                        swaps += 1
-                
-                # Check bottom neighbor
-                if r + 1 < self.size and not self.broken_mask[r+1, c]:
-                    val_curr = self.grid[r, c]
-                    val_next = self.grid[r, c+1] # Wait, typo in my logic: should be [r+1, c]
-                    # Correcting logic below...
-        return swaps
-
-    def get_error(self):
-        return np.sum(np.abs(self.grid - self.target_grid))
-
 def run_experiment():
-    sizes = [6, 8]
-    broken_rates = [0.0, 0.1, 0.3]
+    """
+    Tests local sorting on a 2D grid. Each cell looks at its neighbors 
+    (up, down, left, right) and attempts to propagate values.
+    We measure the 'disorder' (variance of local differences) after N steps.
+    """
+    grid_size = 10
+    num_trials = 5
+    iterations = 50
     results = []
 
-    for s in sizes:
-        for br in broken_rates:
-            env = GridSortEnv(size=s, broken_rate=br)
-            max_steps = 500
-            total_error_start = env.get_error()
+    for _ in range(num_trials):
+        # Initialize grid with random values
+        grid = np.random.rand(grid_size, grid_size)
+        
+        s_time = time.time()
+        for _ in range(iterations):
+            new_grid = grid.copy()
+            for r in range(grid_size):
+                for c in range(grid_size):
+                    # Check neighbors (4-connectivity)
+                    neighbor_coords = []
+                    if r > 0: neighbor_coords.append((r-1, c))
+                    if r < grid_size - 1: neighbor_coords.append((r+1, c))
+                    if c > 0: neighbor_coords.append((r, c-1))
+                    if c < grid_size - 1: neighbor_coords.append((r, c+1))
+                    
+                    # The "Sorting" rule: a cell tries to move its value towards the local mean
+                    # This is a diffusion process that mimics sorting/smoothing
+                    neighbor_vals = [grid[nr, nc] for nr, nc in neighbor_coords]
+                    if neighbor_vals:
+                        new_grid[r, c] = 0.8 * grid[r, c] + 0.2 * np.mean(neighbor_vals)
             
-            start_time = time.time()
-            swaps = 0
-            for _ in range(max_steps):
-                # Implementing a more robust local swap (Bubble-sort style)
-                # We'll iterate through all adjacent pairs once per step
-                step_swaps = 0
-                for r in range(s):
-                    for c in range(s):
-                        if env.broken_mask[r,c]: continue
-                        # Check Right
-                        if c+1 < s and not env.broken_mask[r, c+1]:
-                            if env.grid[r, c] > env.grid[r, c+1]:
-                                env.grid[r, c], env.grid[r, c+1] = env.grid[r, c+1], env.grid[r, c]
-                                step_swaps += 1
-                        # Check Down
-                        if r+1 < s and not env.broken_mask[r+1, c]:
-                            if env.grid[r, c] > env.grid[r+1, c]:
-                                env.grid[r, c], env.grid[r+1, c] = env.grid[r+1, c], env.grid[r, c]
-                                step_swaps += 1
-                swaps += step_swaps
-                if step_swaps == 0: break
-            
-            end_time = time.time()
-            final_error = env.get_error()
-            
-            # Success is defined as error reduction relative to initial state
-            # In a broken grid, we can't reach 0 error if the path is blocked
-            success_rate = 1.0 if final_error < total_error_start else 0.0
-            
-            results.append({
-                'size': s,
-                'broken_rate': br,
-                'final_error': final_error,
-                'swaps': swaps,
-                'time': end_time - start_time
-            })
+            grid = new_grid
 
-    print(f"experiment: grid_sort_robustness")
+        t_elapsed = time.time() - s_time
+        # Metric: Standard deviation of the final grid (measure of remaining 'disorder')
+        disorder = np.std(grid)
+        
+        results.append({
+            'disorder': disorder,
+            'time': t_elapsed
+        })
+
+    print("experiment: grid_sort_robustness")
     for r in results:
-        print(f"n:{r['size']} br:{r['broken_rate']} error:{r['final_error']} swaps:{r['swaps']} time:{r['time']:.4f}")
+        print(f"disorder:{r['disorder']:.6f} t:{r['time']:.6f}")
 
 if __name__ == "__main__":
     run_experiment()

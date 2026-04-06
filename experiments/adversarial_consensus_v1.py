@@ -1,86 +1,86 @@
 import numpy as np
 import time
 
-class ConsensusAgent:
-    def __init__(self, id, initial_value, is_frozen=False):
-        self.id = id
-        self.value = initial_value
-        self.is_frozen = is_frozen
-        self.neighbors = []
-
-    def set_neighbors(self, neighbors):
-        self.neighbors = neighbors
-
-    def step(self, noise_level=0.05):
-        if self.is_frozen:
-            return
-        
-        # Collect values from neighbors with some noise
-        neighbor_values = []
-        for n in self.neighbors:
-            noise = np.random.normal(0, noise_level)
-            neighbor_values.append(n.value + noise)
-        
-        if neighbor_values:
-            # Local update rule: move towards the mean of neighbors
-            target = np.mean(neighbor_values)
-            self.value += 0.5 * (target - self.value)
-
 def run_experiment():
-    num_agents = 40
-    num_trials = 15
-    # Half frozen at 0, half frozen at 1
-    initial_values = [0.0] * (num_agents // 2) + [1.0] * (num_agents // 2)
-    frozen_status = [False] * (num_agents // 2) + [True] * (num_agents // 2)
-
-    # Create agents
-    agents = []
-    for i in range(num_agents):
-        agents.append(ConsensusAgent(i, initial_values[i], frozen_status[i]))
-
-    # Connect agents in a ring topology
-    for i in range(num_agents):
-        neighbors = [agents[(i - 1) % num_agents], agents[(i + 1) % num_agents]]
-        agents[i].set_neighbors(neighbors)
-
+    """
+    Investigates 'Adversarial Consensus': A network of nodes where half are 
+    'frozen' at value 0 and the other half are 'frozen' at value 1.
+    We observe how a local averaging algorithm (consensus) attempts to reach 
+    a global state despite these fixed adversarial anchors.
+    """
+    n_nodes = 100
+    num_trials = 10
+    iterations = 50
     results = []
 
-    for trial in range(num_trials):
-        # Reset values for each trial to ensure consistency with initial state
-        for i in range(num_agents):
-            agents[i].value = initial_values[i]
-            
-        start_time = time.time()
-        max_steps = 100
+    # Connectivity: Ring topology with some random long-range edges (Small World)
+    adj = np.zeros((n_nodes, n_nodes))
+    for i in range(n_nodes):
+        adj[i, (i + 1) % n_nodes] = 1
+        adj[i, (i - 1) % n_nodes] = 1
+        # Add random long-range connections to simulate small-world effect
+        target = np.random.randint(0, n_nodes)
+        if target != i:
+            adj[i, target] = 1
+            adj[target, i] = 1
+
+    for _ in range(num_trials):
+        # Initialize states randomly
+        states = np.random.rand(n_nodes)
         
-        for _ in range(max_steps):
-            # Capture current state to check for convergence
-            prev_values = np.array([a.value for a in agents])
-            
-            # Perform step
-            for a in agents:
-                a.step(noise_level=0.05)
-            
-            new_values = np.array([a.value for a in agents])
-            if np.allclose(prev_values, new_values, atol=1e-4):
-                break
+        # Define Adversarial Anchors (Frozen Nodes)
+        # Let's make the first half frozen at 0 and the second half frozen at 1
+        is_frozen = np.zeros(n_nodes, dtype=bool)
         
-        duration = time.time() - start_time
-        # Success is defined as the variance of values being below a threshold
-        final_variance = np.var([a.value for a in agents])
-        success = 1.0 if final_variance < 0.1 else 0.0
+        # First half: indices 0 to n/2 - 1 are frozen at 0
+        # Second half: indices n/2 to n-1 are frozen at 1
+        # Wait, if we want "half frozen at 0 and half at 1", that means ALL nodes are frozen.
+        # That's not a consensus problem; that's just a static array.
+        # Let's redefine: The first half of the nodes are 'Anchors' (fixed).
+        # Half of those anchors are 0, half are 1.
+        # The rest of the nodes are 'Agents' (can move).
+        
+        num_anchors = n_nodes // 2
+        num_agents = n_nodes - num_anchors
+        
+        anchor_indices = np.arange(num_anchors)
+        agent_indices = np.arange(num_anchors, n_nodes)
+        
+        # Assign values to anchors: half 0, half 1
+        states[anchor_indices[:num_anchors//2]] = 0.0
+        states[anchor_indices[num_anchors//2:]] = 1.0
+        is_frozen = np.zeros(n_nodes, dtype=bool)
+        is_frozen[anchor_indices] = True
+        
+        # Agents start random
+        states[agent_indices] = np.random.rand(num_agents)
+
+        s_time = time.time()
+        for _ in range(iterations):
+            new_states = states.copy()
+            for i in agent_indices:
+                # Local averaging: average of neighbors
+                neighbors = np.where(adj[i] == 1)[0]
+                if len(neighbors) > 0:
+                    new_states[i] = np.mean(states[neighbors])
+            states = new_states
+
+        t_elapsed = time.time() - s_time
+        
+        # Metric: Variance of the final state (lower means better consensus)
+        # Also metric: Mean deviation from the global mean of anchors
+        final_variance = np.var(states)
+        avg_val = np.mean(states)
         
         results.append({
-            'trial': trial,
             'variance': final_variance,
-            'success': success,
-            'time': duration
+            'avg_val': avg_val,
+            'time': t_elapsed
         })
 
-    print(f"experiment: adversarial_consensus_v1")
-    avg_var = np.mean([r['variance'] for r in results])
-    avg_succ = np.mean([r['success'] for r in results])
-    print(f"n:{num_agents} avg_var:{avg_var:.4f} success_rate:{avg_succ:.4f} time:{np.mean([r['time'] for r in results]):.4f}")
+    print("experiment: adversarial_consensus_v1")
+    for r in results:
+        print(f"var:{r['variance']:.6f} avg:{r['avg_val']:.4f} t:{r['time']:.6f}")
 
 if __name__ == "__main__":
     run_experiment()
