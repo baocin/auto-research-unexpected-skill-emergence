@@ -1,10 +1,13 @@
-experiment: scaling_analysis
-N_20_R_1.0_success_0.0271_time_0.0012
-N_20_R_2.0_success_0.1365_time_0.0013
-N_20_R_5.0_success_0.9977_time_0.0013
-N_50_R_1.0_success_0.0579_time_0.0033
-N_50_R_2.0_success_0.1512_time_0.0034
-N_50_R_5.0_success_0.6041_time_0.0033
-N_100_R_1.0_success_0.0870_time_0.0071
-N_100_R_2.0_success_0.1211_time_0.0071
-N_100_R_5.0_success_0.9970_time_0.0074
+experiment: noisy_bubble_sort
+n:10 noise:0.0 success_rate:1.0 avg_time:0.0007
+n:10 noise:0.01 success_rate:0.8 avg_time:0.0000
+n:10 noise:0.05 success_rate:0.2 avg_time:0.0000
+n:10 noise:0.1 success_rate:0.05 avg_time:0.0000
+n:20 noise:0.0 success_rate:1.0 avg_time:0.0001
+n:20 noise:0.01 success_rate:0.55 avg_time:0.0001
+n:20 noise:0.05 success_rate:0.1 avg_time:0.0001
+n:20 noise:0.1 success_rate:0.0 avg_time:0.0001
+n:50 noise:0.0 success_rate:1.0 avg_time:0.0003
+n:50 noise:0.01 success_rate:0.15 avg_time:0.0003
+n:50 noise:0.05 success_rate:0.0 avg_time:0.0003
+n:50 noise:0.1 success_rate:0.0 avg_time:0.0004

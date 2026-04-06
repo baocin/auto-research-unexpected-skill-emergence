@@ -406,15 +406,24 @@ def run_agent():
             - Phase 3: Target search - random walk (20%) beats deterministic gradient (5%)
               in damaged environments. Stochasticity = robustness.
 
-            NEXT: Continue Phase 3+ with MORE non-sorting algorithms. Ideas:
-            1. Distributed consensus (majority voting with damaged voters)
-            2. Local anomaly detection (each element decides if it's an outlier)
-            3. Distributed graph shortest path (Bellman-Ford style)
-            4. K-means clustering with autonomous points
-            5. Load balancing / work redistribution
-            6. Try different damage models (noisy execution, adversarial)
-            7. Scale experiments to larger arrays (N=50, N=100)
+            COMPLETED (do NOT repeat these):
+            - Consensus: done extensively (anchors, adversarial, oscillating, error scaling)
+            - K-means: done extensively (noise, topology, radius, density, dropout, drift)
+            - Anomaly detection: done (sensor damage, SNR breakdown, streaming)
+            - Grid sorting: done (obstacles, dead zones)
 
+            NEXT: Explore COMPLETELY NEW domains. Pick ONE per experiment:
+            1. Distributed Bellman-Ford shortest path with damaged edges
+            2. Load balancing: workers redistribute tasks locally, some workers frozen
+            3. Epidemic/rumor spreading on damaged networks
+            4. Local leader election with faulty nodes
+            5. Distributed coloring: nodes pick colors to differ from neighbors
+            6. Token ring / mutual exclusion with damaged nodes
+            7. Return to SORTING: test cocktail shaker, shell sort, comb sort cell-view
+            8. 2D sorting on grids with the original Levin cell-view model
+
+            IMPORTANT: Do NOT create more k-means or consensus variants.
+            Each experiment must be a genuinely NEW algorithm or domain.
             Create new experiment files in experiments/ directory.
             Use edit_file for modifying existing files. Always use action tags.
         """)},
