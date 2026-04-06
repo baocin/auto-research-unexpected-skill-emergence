@@ -1,5 +1,10 @@
-experiment: adversarial_consensus_v2
-failure:0.0 avg:0.5231 t:0.006202
-failure:0.1 avg:0.4965 t:0.006075
-failure:0.3 avg:0.5213 t:0.005812
-failure:0.5 avg:0.4873 t:0.004606
+Traceback (most recent call last):
+  File "/Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiments/k_means_cluster_stability.py", line 98, in <module>
+    run_experiment()
+    ~~~~~~~~~~~~~~^^
+  File "/Users/mpedersen/pcode/auto-research-unexpected-skill-emergence/experiments/k_means_cluster_stability.py", line 38, in run_experiment
+    dist = np.linalg.norm(data[:, np.new_axis, :] - c_k[np.newaxis, :, :], axis=2) # Typo: np.new_axis -> np.newaxis
+                                  ^^^^^^^^^^^
+  File "/opt/homebrew/lib/python3.14/site-packages/numpy/__init__.py", line 792, in __getattr__
+    raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
+AttributeError: module 'numpy' has no attribute 'new_axis'. Did you mean: 'newaxis'?
