@@ -448,22 +448,46 @@ def run_agent():
         actions = parse_actions(response)
 
         if not actions:
-            print("[AGENT] No actions parsed, prompting for structured actions...")
+            no_action_count = getattr(run_agent, '_no_action_count', 0) + 1
+            run_agent._no_action_count = no_action_count
+            print(f"[AGENT] No actions parsed ({no_action_count} consecutive)")
+
+            if no_action_count >= 3:
+                # Agent is stuck thinking it's done. Reset with a new task.
+                print("[AGENT] Stuck in no-action loop. Injecting new research direction...")
+                run_agent._no_action_count = 0
+                new_ideas = [
+                    "Test ADVERSARIAL consensus: half frozen at 0, half at 1. Does it still converge? Create experiments/adversarial_consensus.py",
+                    "Implement distributed anomaly detection: each node decides if its value is an outlier based on neighbors. Create experiments/anomaly_detection.py",
+                    "Test 2D grid topology instead of 1D: does sorting/consensus behave differently? Create experiments/grid_sorting.py",
+                    "Implement local k-means: each point moves toward the centroid of its neighbors. Create experiments/local_kmeans.py",
+                    "Test noise-as-damage model: instead of frozen cells, cells randomly flip their output. Create experiments/noisy_execution.py",
+                    "Scale up: run sorting experiments at N=100 and N=200. Modify experiment.py config.",
+                ]
+                import random
+                idea = random.choice(new_ideas)
+                messages = [messages[0]]  # Reset to just system prompt
+                messages.append({"role": "user", "content":
+                    f"NEW TASK: {idea}\n\n"
+                    f"Use action tags to create the file and run the experiment. "
+                    f"Remember: <action type=\"write_file\" path=\"path\">content</action> "
+                    f"and <action type=\"shell\">command</action>"
+                })
+                continue
+
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content":
-                "Use action tags. Example:\n"
-                '<action type="shell">python3 experiment.py > run.log 2>&1</action>\n'
-                "or to edit:\n"
-                '<action type="edit_file" path="experiment.py">\n'
-                "<<<OLD\n"
-                "MAX_STEPS = 100_000\n"
-                "===\n"
-                "MAX_STEPS = 200_000\n"
-                ">>>NEW\n"
-                "</action>"
+                "You MUST use action tags to continue. Do NOT summarize - start a new experiment.\n"
+                "Pick one of these and CREATE the experiment file:\n"
+                "1. Adversarial consensus (half frozen at 0, half at 1)\n"
+                "2. Anomaly detection with damaged sensors\n"
+                "3. 2D grid sorting\n"
+                "4. Local k-means clustering\n\n"
+                "Example: <action type=\"write_file\" path=\"experiments/new_experiment.py\">code here</action>"
             })
             continue
 
+        run_agent._no_action_count = 0  # Reset stuck counter
         print(f"\n[EXECUTING {len(actions)} action(s)]")
         results = execute_actions(actions)
         print(f"\n[RESULTS]\n{results[:2000]}")
