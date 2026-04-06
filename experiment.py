@@ -21,9 +21,9 @@ from collections import defaultdict
 # EXPERIMENT CONFIGURATION (agent modifies these)
 # ============================================================================
 
-ARRAY_SIZE = 50            # Number of elements in the array
-NUM_TRIALS = 50            # Trials per configuration
-MAX_STEPS = 100_000        # Max local steps before timeout
+ARRAY_SIZE = 20            # Number of elements in the array
+NUM_TRIALS = 30            # Trials per configuration
+MAX_STEPS = 50_000         # Max local steps before timeout
 DAMAGE_RATES = [0.0, 0.05, 0.10, 0.20, 0.30]  # Fraction of frozen cells
 EXPERIMENT_NAME = "phase1_replication_bubble_sort"
 SEED = 42
@@ -128,15 +128,22 @@ def cell_view_bubble_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
 
     for step in range(max_steps):
         # Pick a random element
-        idx = rng.integers(0, n - 1)  # exclude last (no right neighbor)
+        idx = rng.integers(0, n)
 
         # Frozen cells do nothing (but others CAN swap with them)
         if idx in frozen_set:
             continue
 
-        # Local policy: compare with right neighbor, swap if out of order
-        if a[idx] > a[idx + 1]:
-            a[idx], a[idx + 1] = a[idx + 1], a[idx]
+        # Local policy: check both neighbors to ensure coverage even if one side is frozen
+        # Check right neighbor
+        if idx < n - 1:
+            if a[idx] > a[idx + 1]:
+                a[idx], a[idx + 1] = a[idx + 1], a[idx]
+        
+        # Check left neighbor
+        if idx > 0:
+            if a[idx-1] > a[idx]:
+                a[idx-1], a[idx] = a[idx], a[idx-1]
 
         # Record trajectory periodically
         if step % (max_steps // 100 + 1) == 0:
@@ -160,13 +167,13 @@ def cell_view_insertion_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
     trajectory = []
 
     for step in range(max_steps):
-        idx = rng.integers(1, n)  # exclude first (can't move left)
+        idx = rng.integers(0, n)
 
-        if idx in frozen_set or (idx - 1) in frozen_set:
+        if idx in frozen_set:
             continue
 
         # Local policy: compare with left neighbor, swap if smaller
-        if a[idx] < a[idx - 1]:
+        if idx > 0 and a[idx] < a[idx - 1]:
             a[idx], a[idx - 1] = a[idx - 1], a[idx]
 
         if step % (max_steps // 100 + 1) == 0:
@@ -195,10 +202,10 @@ def cell_view_selection_sort(arr, frozen_set, max_steps=MAX_STEPS, rng=None):
         if idx in frozen_set:
             continue
 
-        # Local policy: find minimum in remaining unsorted portion
-        # Cell-view: compare with a random element to the right, swap if smaller
+        # Local policy: compare with a random element to the right, swap if smaller
+        # We allow swapping even if 'other' is frozen, as long as 'idx' (the actor) is active.
         other = rng.integers(0, n)
-        if other == idx or other in frozen_set:
+        if other == idx:
             continue
 
         # Swap if it moves both elements closer to sorted positions
@@ -247,18 +254,18 @@ def cell_view_chimeric_sort(arr, algotypes, frozen_set, max_steps=MAX_STEPS, rng
 
         # Execute local policy based on algotype
         if algo_name == "bubble":
-            if idx < n - 1 and (idx + 1) not in frozen_set:
+            if idx < n - 1:
                 if a[idx] > a[idx + 1]:
                     a[idx], a[idx + 1] = a[idx + 1], a[idx]
                     types[idx], types[idx + 1] = types[idx + 1], types[idx]
         elif algo_name == "insertion":
-            if idx > 0 and (idx - 1) not in frozen_set:
+            if idx > 0:
                 if a[idx] < a[idx - 1]:
                     a[idx], a[idx - 1] = a[idx - 1], a[idx]
                     types[idx], types[idx - 1] = types[idx - 1], types[idx]
         elif algo_name == "selection":
             other = rng.integers(0, n)
-            if other != idx and other not in frozen_set:
+            if other != idx:
                 if (idx < other and a[idx] > a[other]) or (idx > other and a[idx] < a[other]):
                     a[idx], a[other] = a[other], a[idx]
                     types[idx], types[other] = types[other], types[idx]

@@ -2,7 +2,7 @@
 Autonomous research agent that drives experiments via LM Studio (OpenAI-compatible API).
 
 Usage:
-    python3 agent.py
+    PYTHONUNBUFFERED=1 python3 -u agent.py
 
 Connects to LM Studio at http://127.0.0.1:1234 and uses program.md to guide
 autonomous experimentation on experiment.py.
@@ -15,7 +15,12 @@ import subprocess
 import re
 import time
 import textwrap
+import difflib
 from pathlib import Path
+
+# Force unbuffered output so logs appear in real time
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 try:
     import openai
@@ -31,7 +36,7 @@ except ImportError:
 LMSTUDIO_BASE_URL = "http://127.0.0.1:1234/v1"
 MODEL = "gemma-4-26b-a4b-it"
 MAX_CONTEXT_TOKENS = 90_000  # leave headroom under 94k
-MAX_RESPONSE_TOKENS = 8192
+MAX_RESPONSE_TOKENS = 16384
 WORKDIR = Path(__file__).parent.resolve()
 EXPERIMENT_FILE = WORKDIR / "experiment.py"
 PROGRAM_FILE = WORKDIR / "program.md"
@@ -46,7 +51,7 @@ MAX_EXPERIMENT_TIME = 300  # 5 minutes max per experiment run
 
 client = openai.OpenAI(
     base_url=LMSTUDIO_BASE_URL,
-    api_key="lm-studio",  # LM Studio doesn't need a real key
+    api_key="lm-studio",
 )
 
 def llm_chat(messages, temperature=0.7):
@@ -72,38 +77,87 @@ def read_file(path):
     p = WORKDIR / path if not Path(path).is_absolute() else Path(path)
     try:
         content = p.read_text()
-        # Truncate if too large to fit in context
-        if len(content) > 30_000:
-            content = content[:30_000] + "\n\n... [TRUNCATED] ..."
+        if len(content) > 20_000:
+            content = content[:20_000] + "\n\n... [TRUNCATED] ..."
         return content
     except FileNotFoundError:
         return f"[FILE NOT FOUND: {p}]"
 
 def write_file(path, content):
-    """Write content to a file."""
+    """Write content to a file. Rejects suspiciously short writes to existing large files."""
     p = WORKDIR / path if not Path(path).is_absolute() else Path(path)
+    # Safety: don't allow overwriting a large file with a tiny one
+    if p.exists():
+        old_len = len(p.read_text())
+        new_len = len(content)
+        if old_len > 500 and new_len < old_len * 0.3:
+            return (f"[REJECTED write to {p}: new content ({new_len} chars) is much smaller "
+                    f"than existing ({old_len} chars). Use edit_file to make targeted changes, "
+                    f"or write_new_file for new files.]")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
-    return f"[WRITTEN: {p}]"
+    return f"[WRITTEN: {p} ({len(content)} chars)]"
+
+def edit_file(path, old_text, new_text):
+    """Search-and-replace edit: find old_text in file and replace with new_text."""
+    p = WORKDIR / path if not Path(path).is_absolute() else Path(path)
+    try:
+        content = p.read_text()
+    except FileNotFoundError:
+        return f"[FILE NOT FOUND: {p}]"
+
+    if old_text not in content:
+        # Try to find a close match
+        lines = content.split('\n')
+        old_lines = old_text.split('\n')
+        matches = difflib.get_close_matches(old_lines[0], lines, n=1, cutoff=0.6)
+        hint = f" Closest match to first line: '{matches[0]}'" if matches else ""
+        return f"[EDIT FAILED: old_text not found in {p}.{hint}]"
+
+    count = content.count(old_text)
+    if count > 1:
+        return f"[EDIT FAILED: old_text appears {count} times in {p}. Provide more context to make it unique.]"
+
+    new_content = content.replace(old_text, new_text, 1)
+    p.write_text(new_content)
+    return f"[EDITED: {p} (replaced {len(old_text)} chars with {len(new_text)} chars)]"
+
+def append_file(path, content):
+    """Append content to end of a file."""
+    p = WORKDIR / path if not Path(path).is_absolute() else Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, 'a') as f:
+        f.write(content)
+    return f"[APPENDED to {p}]"
 
 def run_shell(cmd, timeout=MAX_EXPERIMENT_TIME):
-    """Run a shell command and return stdout+stderr."""
+    """Run a shell command and return stdout+stderr. Kills child processes on timeout."""
+    import signal
     try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True,
-            timeout=timeout, cwd=str(WORKDIR)
+        proc = subprocess.Popen(
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, cwd=str(WORKDIR), preexec_fn=os.setsid
         )
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kill the entire process group
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            time.sleep(2)
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            return f"[TIMEOUT after {timeout}s - process killed]"
+
         output = ""
-        if result.stdout:
-            output += result.stdout
-        if result.stderr:
-            output += "\n[STDERR]\n" + result.stderr
-        # Truncate long output
-        if len(output) > 10_000:
-            output = output[:5_000] + "\n\n... [TRUNCATED] ...\n\n" + output[-3_000:]
+        if stdout:
+            output += stdout
+        if stderr:
+            output += "\n[STDERR]\n" + stderr
+        if len(output) > 8_000:
+            output = output[:4_000] + "\n\n... [TRUNCATED] ...\n\n" + output[-2_000:]
         return output.strip()
-    except subprocess.TimeoutExpired:
-        return f"[TIMEOUT after {timeout}s]"
     except Exception as e:
         return f"[SHELL ERROR: {e}]"
 
@@ -119,40 +173,74 @@ def git_commit(message):
 def parse_actions(response):
     """Parse the LLM response for actions to execute.
 
-    Expected format in the response:
-
-    <action type="read_file">path/to/file</action>
-    <action type="write_file" path="path/to/file">
-    file content here
+    Supported actions:
+    <action type="read_file">path</action>
+    <action type="write_file" path="path">content</action>
+    <action type="edit_file" path="path">
+    <<<OLD
+    old text
+    ===
+    new text
+    >>>NEW
     </action>
-    <action type="shell">command here</action>
-    <action type="commit">commit message</action>
-    <action type="done">summary of findings</action>
+    <action type="append_file" path="path">content to append</action>
+    <action type="shell">command</action>
+    <action type="commit">message</action>
     """
     actions = []
 
-    # Parse XML-style action tags
-    # read_file
-    for m in re.finditer(r'<action\s+type="read_file">(.*?)</action>', response, re.DOTALL):
-        actions.append(("read_file", m.group(1).strip()))
+    # read_file - support both <action type="read_file">path</action> and self-closing
+    for m in re.finditer(r'<action\s+type="read_file"(?:\s+path="(.*?)")?\s*/>', response, re.DOTALL):
+        if m.group(1):
+            actions.append(("read_file", m.group(1).strip()))
+    for m in re.finditer(r'<action\s+type="read_file"(?:\s+path="(.*?)")?>(.*?)</action>', response, re.DOTALL):
+        path = m.group(1) or m.group(2).strip()
+        if path:
+            actions.append(("read_file", path))
 
-    # write_file
+    # edit_file (search/replace - PREFERRED for modifying existing files)
+    for m in re.finditer(r'<action\s+type="edit_file"\s+path="(.*?)">(.*?)</action>', response, re.DOTALL):
+        body = m.group(2).strip()
+        # Parse <<<OLD ... === ... >>>NEW format
+        edit_match = re.search(r'<<<\s*OLD\s*\n(.*?)\n\s*===\s*\n(.*?)\n\s*>>>\s*NEW', body, re.DOTALL)
+        if edit_match:
+            actions.append(("edit_file", m.group(1).strip(), edit_match.group(1), edit_match.group(2)))
+        else:
+            # Fallback: try splitting on === separator
+            parts = body.split('\n===\n', 1)
+            if len(parts) == 2:
+                actions.append(("edit_file", m.group(1).strip(), parts[0], parts[1]))
+
+    # write_file (for NEW files only)
     for m in re.finditer(r'<action\s+type="write_file"\s+path="(.*?)">(.*?)</action>', response, re.DOTALL):
         actions.append(("write_file", m.group(1).strip(), m.group(2).strip()))
 
-    # shell
+    # append_file
+    for m in re.finditer(r'<action\s+type="append_file"\s+path="(.*?)">(.*?)</action>', response, re.DOTALL):
+        actions.append(("append_file", m.group(1).strip(), m.group(2).strip()))
+
+    # shell - also handle self-closing with cmd attribute
+    for m in re.finditer(r'<action\s+type="shell"\s+cmd="(.*?)"\s*/>', response, re.DOTALL):
+        actions.append(("shell", m.group(1).strip()))
     for m in re.finditer(r'<action\s+type="shell">(.*?)</action>', response, re.DOTALL):
         actions.append(("shell", m.group(1).strip()))
 
     # commit
     for m in re.finditer(r'<action\s+type="commit">(.*?)</action>', response, re.DOTALL):
         actions.append(("commit", m.group(1).strip()))
+    for m in re.finditer(r'<action\s+type="commit"\s+msg="(.*?)"\s*/>', response, re.DOTALL):
+        actions.append(("commit", m.group(1).strip()))
 
-    # done
-    for m in re.finditer(r'<action\s+type="done">(.*?)</action>', response, re.DOTALL):
-        actions.append(("done", m.group(1).strip()))
+    # Deduplicate (same action can match multiple patterns)
+    seen = set()
+    unique = []
+    for a in actions:
+        key = str(a)
+        if key not in seen:
+            seen.add(key)
+            unique.append(a)
 
-    return actions
+    return unique
 
 def execute_actions(actions):
     """Execute parsed actions and return results."""
@@ -164,13 +252,20 @@ def execute_actions(actions):
             content = read_file(action[1])
             results.append(f"[READ {action[1]}]\n{content}")
 
+        elif action_type == "edit_file":
+            result = edit_file(action[1], action[2], action[3])
+            results.append(result)
+
         elif action_type == "write_file":
             result = write_file(action[1], action[2])
             results.append(result)
 
+        elif action_type == "append_file":
+            result = append_file(action[1], action[2])
+            results.append(result)
+
         elif action_type == "shell":
             cmd = action[1]
-            # Safety: block dangerous commands
             dangerous = ["rm -rf /", "rm -rf ~", "sudo", "mkfs", "dd if="]
             if any(d in cmd for d in dangerous):
                 results.append(f"[BLOCKED dangerous command: {cmd}]")
@@ -182,9 +277,6 @@ def execute_actions(actions):
             result = git_commit(action[1])
             results.append(f"[COMMIT: {action[1]}]\n{result}")
 
-        elif action_type == "done":
-            results.append(f"[DONE: {action[1]}]")
-
     return "\n\n".join(results)
 
 # ============================================================================
@@ -192,39 +284,81 @@ def execute_actions(actions):
 # ============================================================================
 
 SYSTEM_PROMPT = textwrap.dedent("""\
-You are an autonomous research agent. You read program.md for instructions and
-conduct experiments by modifying experiment.py, running it, and analyzing results.
+You are an autonomous research agent investigating emergent competencies in
+locally-executed algorithms, inspired by Levin et al. (2025).
 
-You communicate actions using XML tags:
+You modify experiment.py, run experiments, and analyze results.
 
-<action type="read_file">path/to/file</action>
-<action type="write_file" path="path/to/file">
-content
+## Actions (use XML tags - MUST have opening AND closing tags, NO self-closing)
+
+To run a command:
+<action type="shell">python3 experiment.py > run.log 2>&1</action>
+
+To read a file:
+<action type="read_file">experiment.py</action>
+
+To edit a file (search and replace):
+<action type="edit_file" path="experiment.py">
+<<<OLD
+exact old text
+===
+new replacement text
+>>>NEW
 </action>
-<action type="shell">command</action>
-<action type="commit">commit message</action>
-<action type="done">summary when you want to report findings</action>
 
-RULES:
-- Always think step by step before acting
-- Read files before modifying them
-- Run experiments with: python3 experiment.py > run.log 2>&1
-- Check results with: grep "^success_rate\\|^experiment:\\|^total_seconds:" run.log
-- If a run crashes, check: tail -50 run.log
-- Keep experiments under 5 minutes wall clock
-- Keep array sizes reasonable (≤500) to avoid memory issues
-- Log results to results.tsv and update REPORT.md periodically
-- Commit after each successful experiment
-- NEVER stop experimenting. If you finish one phase, move to the next.
-- Include your reasoning before each action
+To create a NEW file:
+<action type="write_file" path="experiments/new_test.py">file content here</action>
 
-You are running on a local machine (macOS, no GPU). Experiments are CPU-only Python.
+To append to a file:
+<action type="append_file" path="results.tsv">row data here</action>
+
+To git commit:
+<action type="commit">descriptive message</action>
+
+IMPORTANT: Every tag MUST have a closing </action> tag. Do NOT use self-closing tags like <action ... />.
+
+## CRITICAL RULES
+- Use edit_file (search/replace) to modify existing files. NEVER use write_file on existing files.
+- The OLD text must match EXACTLY (including whitespace/indentation).
+- Keep edits small and focused. One change per edit_file action.
+- Run experiments: python3 experiment.py > run.log 2>&1
+- Check results: grep "^success_rate\\|^experiment:\\|^total_seconds:" run.log
+- If crash: tail -50 run.log
+- Max array size: 500. Max experiment time: 5 minutes.
+- Commit after each successful experiment.
+- NEVER stop. Move to next phase when done with current.
+- One action per step is fine. Quality over quantity.
+
+## Research phases
+1. REPLICATE Levin: cell-view bubble/insertion/selection sort with frozen cells
+2. EXTEND to more sorting algorithms (merge, quick, shell, cocktail, gnome, comb)
+3. BEYOND sorting: search, graph, consensus, anomaly detection, clustering
+4. ANALYZE: what properties predict emergent robustness?
+
 Working directory: {workdir}
 """).format(workdir=str(WORKDIR))
 
 # ============================================================================
 # AGENT LOOP
 # ============================================================================
+
+def get_config_section():
+    """Extract just the config section from experiment.py for context."""
+    try:
+        content = EXPERIMENT_FILE.read_text()
+        lines = content.split('\n')
+        config_lines = []
+        in_config = False
+        for line in lines:
+            if 'EXPERIMENT CONFIGURATION' in line:
+                in_config = True
+            if in_config:
+                config_lines.append(line)
+            if in_config and line.strip() == '' and len(config_lines) > 3:
+                break
+        return '\n'.join(config_lines) if config_lines else content[:500]
+    except:
+        return "[Could not read experiment.py]"
 
 def run_agent():
     """Main agent loop."""
@@ -245,29 +379,43 @@ def run_agent():
         print("Start LM Studio and load the model first.")
         sys.exit(1)
 
-    # Initialize conversation with context
-    program = read_file("program.md")
-    experiment_code = read_file("experiment.py")
+    # Load compact context (NOT the full files - just summaries)
+    config_section = get_config_section()
+
+    # Get list of available algorithms
+    try:
+        content = EXPERIMENT_FILE.read_text()
+        algo_funcs = re.findall(r'^def (cell_view_\w+|traditional_\w+)\(', content, re.MULTILINE)
+        algo_list = ', '.join(algo_funcs)
+    except:
+        algo_list = "unknown"
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": textwrap.dedent(f"""\
-            Here are your instructions and the current experiment code.
-            Read them, then begin the experiment loop as described in program.md.
+            Current experiment.py config section:
+            {config_section}
 
-            === program.md ===
-            {program}
+            Available algorithm functions: {algo_list}
 
-            === experiment.py (current) ===
-            {experiment_code}
+            The experiment framework has cell-view and traditional versions of
+            bubble sort, insertion sort, and selection sort. It also has chimeric
+            experiment support.
 
-            Begin! Start with Phase 1: replication of Levin et al.'s sorting experiments.
-            Read any additional files you need, then start experimenting.
+            The current baseline shows 0% success rate at any damage rate > 0.
+            This likely means the frozen cell model needs fixing or MAX_STEPS is too low.
+
+            In Levin's paper, frozen cells don't execute their OWN policy, but
+            active cells CAN still interact with/swap past frozen neighbors.
+
+            Start by diagnosing and fixing this. Use edit_file to make targeted changes.
+            Then run the experiment and analyze results.
         """)},
     ]
 
     iteration = 0
-    max_iterations = 200  # safety limit
+    max_iterations = 500
+    consecutive_failures = 0
 
     while iteration < max_iterations:
         iteration += 1
@@ -275,66 +423,64 @@ def run_agent():
         print(f"ITERATION {iteration}")
         print(f"{'=' * 40}")
 
-        # Get LLM response
         response = llm_chat(messages)
         if response is None:
-            print("[AGENT] LLM returned None, retrying in 5s...")
-            time.sleep(5)
+            consecutive_failures += 1
+            if consecutive_failures > 5:
+                print("[AGENT] Too many consecutive LLM failures. Waiting 60s...")
+                time.sleep(60)
+                consecutive_failures = 0
+            else:
+                print("[AGENT] LLM returned None, retrying in 10s...")
+                time.sleep(10)
             continue
 
-        print(f"\n[AGENT THINKING]\n{response[:500]}...")
+        consecutive_failures = 0
+        print(f"\n[AGENT RESPONSE]\n{response[:800]}...")
 
-        # Parse and execute actions
         actions = parse_actions(response)
 
         if not actions:
-            # No parseable actions - ask the LLM to use the action format
-            print("[AGENT] No actions parsed, prompting for actions...")
+            print("[AGENT] No actions parsed, prompting for structured actions...")
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content":
-                "Please use the action tags to perform your next step. "
-                "For example: <action type=\"shell\">python3 experiment.py > run.log 2>&1</action>"
+                "Use action tags. Example:\n"
+                '<action type="shell">python3 experiment.py > run.log 2>&1</action>\n'
+                "or to edit:\n"
+                '<action type="edit_file" path="experiment.py">\n'
+                "<<<OLD\n"
+                "MAX_STEPS = 100_000\n"
+                "===\n"
+                "MAX_STEPS = 200_000\n"
+                ">>>NEW\n"
+                "</action>"
             })
             continue
 
-        print(f"\n[EXECUTING {len(actions)} actions]")
+        print(f"\n[EXECUTING {len(actions)} action(s)]")
         results = execute_actions(actions)
-        print(f"\n[RESULTS]\n{results[:1000]}...")
+        print(f"\n[RESULTS]\n{results[:2000]}")
 
-        # Add to conversation
         messages.append({"role": "assistant", "content": response})
-        messages.append({"role": "user", "content": f"Action results:\n\n{results}\n\nContinue with the next experiment step."})
+        messages.append({"role": "user", "content":
+            f"Action results:\n\n{results}\n\nContinue. What's next?"})
 
-        # Context window management: trim old messages if getting large
+        # Context management
         total_chars = sum(len(m["content"]) for m in messages)
-        if total_chars > MAX_CONTEXT_TOKENS * 3:  # rough chars-to-tokens ratio
-            print("[AGENT] Trimming conversation history...")
-            # Keep system prompt + last 6 messages
-            messages = [messages[0]] + messages[-6:]
-            # Re-inject current state
-            current_code = read_file("experiment.py")
-            results_tsv = read_file("results.tsv") if RESULTS_TSV.exists() else "[No results yet]"
-            messages.insert(1, {"role": "user", "content": textwrap.dedent(f"""\
-                [Context refresh - conversation was trimmed]
+        if total_chars > MAX_CONTEXT_TOKENS * 3:
+            print("[AGENT] Trimming conversation...")
+            # Keep system + last 8 messages
+            messages = [messages[0]] + messages[-8:]
+            # Inject fresh state
+            config = get_config_section()
+            tsv = read_file("results.tsv") if RESULTS_TSV.exists() else "[No results yet]"
+            messages.insert(1, {"role": "user", "content":
+                f"[Context refresh]\n\nCurrent config:\n{config}\n\nResults so far:\n{tsv}\n\nContinue experimenting."
+            })
 
-                Current experiment.py:
-                {current_code}
+        time.sleep(1)
 
-                Current results.tsv:
-                {results_tsv}
-
-                Continue experimenting per program.md instructions.
-            """)})
-
-        # Check for done signal (just log it, don't stop)
-        for action in actions:
-            if action[0] == "done":
-                print(f"\n[AGENT REPORTED DONE]: {action[1]}")
-                print("Continuing anyway (autonomous mode)...")
-
-        time.sleep(1)  # small delay between iterations
-
-    print(f"\n[AGENT] Reached max iterations ({max_iterations}). Stopping.")
+    print(f"\n[AGENT] Reached max iterations ({max_iterations}).")
 
 if __name__ == "__main__":
     run_agent()

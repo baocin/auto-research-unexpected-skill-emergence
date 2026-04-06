@@ -1,0 +1,59 @@
+=== Experiment: phase1_replication_bubble_sort ===
+Array size: 20, Trials: 30, Max steps: 50000
+Damage rates: [0.0, 0.05, 0.1, 0.2, 0.3]
+
+Running bubble sort...
+  damage=0.0: success_rate=1.00, mean_steps=208, mean_disorder=0.0000
+  damage=0.05: success_rate=1.00, mean_steps=218, mean_disorder=0.0000
+  damage=0.1: success_rate=0.97, mean_steps=1897, mean_disorder=0.0033
+  damage=0.2: success_rate=0.57, mean_steps=21831, mean_disorder=0.0863
+  damage=0.3: success_rate=0.03, mean_steps=48342, mean_disorder=0.2170
+
+Running insertion sort...
+  damage=0.0: success_rate=1.00, mean_steps=452, mean_disorder=0.0000
+  damage=0.05: success_rate=0.00, mean_steps=50000, mean_disorder=0.1619
+  damage=0.1: success_rate=0.00, mean_steps=50000, mean_disorder=0.2670
+  damage=0.2: success_rate=0.00, mean_steps=50000, mean_disorder=0.3695
+  damage=0.3: success_rate=0.00, mean_steps=50000, mean_disorder=0.4039
+
+Running selection sort...
+  damage=0.0: success_rate=1.00, mean_steps=850, mean_disorder=0.0000
+  damage=0.05: success_rate=1.00, mean_steps=928, mean_disorder=0.0000
+  damage=0.1: success_rate=1.00, mean_steps=916, mean_disorder=0.0000
+  damage=0.2: success_rate=0.80, mean_steps=10933, mean_disorder=0.0014
+  damage=0.3: success_rate=0.27, mean_steps=36985, mean_disorder=0.0061
+
+Running chimeric experiments...
+
+  Chimeric: bubble + insertion
+    damage=0.0: success_rate=0.00, mean_steps=50000, peak_clustering=0.5053
+    damage=0.05: success_rate=0.00, mean_steps=50000, peak_clustering=0.5193
+    damage=0.1: success_rate=0.00, mean_steps=50000, peak_clustering=0.5456
+    damage=0.2: success_rate=0.00, mean_steps=50000, peak_clustering=0.5175
+    damage=0.3: success_rate=0.00, mean_steps=50000, peak_clustering=0.5053
+
+  Chimeric: bubble + selection
+    damage=0.0: success_rate=1.00, mean_steps=1016, peak_clustering=0.5737
+    damage=0.05: success_rate=0.67, mean_steps=17411, peak_clustering=0.5561
+    damage=0.1: success_rate=0.43, mean_steps=28897, peak_clustering=0.5544
+    damage=0.2: success_rate=0.13, mean_steps=43596, peak_clustering=0.5667
+    damage=0.3: success_rate=0.00, mean_steps=50000, peak_clustering=0.5246
+
+  Chimeric: insertion + selection
+    damage=0.0: success_rate=1.00, mean_steps=1034, peak_clustering=0.5772
+    damage=0.05: success_rate=0.60, mean_steps=20692, peak_clustering=0.5912
+    damage=0.1: success_rate=0.43, mean_steps=28839, peak_clustering=0.5649
+    damage=0.2: success_rate=0.10, mean_steps=45164, peak_clustering=0.5737
+    damage=0.3: success_rate=0.00, mean_steps=50000, peak_clustering=0.5404
+
+---
+experiment:       phase1_replication_bubble_sort
+array_size:       20
+num_trials:       30
+total_seconds:    26.1
+success_rate_bubble_dmg0.3: 0.0333
+success_rate_insertion_dmg0.3: 0.0000
+success_rate_selection_dmg0.3: 0.2667
+num_algorithms:   3
+num_chimeric:     3
+results_file:     run_results.json
