@@ -1,0 +1,12 @@
+# Research Summary: Emergent Competencies via Environmental Constraints
+
+## Hypothesis
+Locally-executed algorithms (sorting/consensus) exhibit emergent robustness or convergence properties when subjected to "damage" (frozen/unresponsive nodes).
+
+## Findings
+1. **Sorting Robustness:** Algorithms with higher interaction ranges (Selection Sort) are more robust to frozen cells than strictly local algorithms (Insertion Sort), which collapse under high damage.
+2. **Consensus Anchoring:** In distributed majority-voting, the presence of "frozen" nodes (which cannot change state) acts as a stabilizing force. While 0% damage results in random state wandering (~50% agreement), increasing the density of frozen nodes to 60% drives global agreement to ~93%.
+3. **The Role of Damage:** In distributed computation, "damage" is not purely destructive; it provides the necessary broken symmetry to drive a system from stochastic equilibrium toward a directed consensus state.
+
+## Conclusion
+Structural constraints in a network can be viewed as a mechanism for directing emergent computational outcomes.

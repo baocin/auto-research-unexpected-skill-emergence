@@ -398,18 +398,25 @@ def run_agent():
 
             Available algorithm functions: {algo_list}
 
-            The experiment framework has cell-view and traditional versions of
-            bubble sort, insertion sort, and selection sort. It also has chimeric
-            experiment support.
+            COMPLETED PHASES:
+            - Phase 1: Replicated Levin et al. Bubble sort robust (97% at 10% dmg),
+              insertion sort collapses (0% at 5% dmg), selection sort most robust (100% at 10%).
+            - Phase 2: Added gnome sort (surprisingly fragile at 15% at 10% dmg).
+              Interaction range is the key predictor of robustness.
+            - Phase 3: Target search - random walk (20%) beats deterministic gradient (5%)
+              in damaged environments. Stochasticity = robustness.
 
-            The current baseline shows 0% success rate at any damage rate > 0.
-            This likely means the frozen cell model needs fixing or MAX_STEPS is too low.
+            NEXT: Continue Phase 3+ with MORE non-sorting algorithms. Ideas:
+            1. Distributed consensus (majority voting with damaged voters)
+            2. Local anomaly detection (each element decides if it's an outlier)
+            3. Distributed graph shortest path (Bellman-Ford style)
+            4. K-means clustering with autonomous points
+            5. Load balancing / work redistribution
+            6. Try different damage models (noisy execution, adversarial)
+            7. Scale experiments to larger arrays (N=50, N=100)
 
-            In Levin's paper, frozen cells don't execute their OWN policy, but
-            active cells CAN still interact with/swap past frozen neighbors.
-
-            Start by diagnosing and fixing this. Use edit_file to make targeted changes.
-            Then run the experiment and analyze results.
+            Create new experiment files in experiments/ directory.
+            Use edit_file for modifying existing files. Always use action tags.
         """)},
     ]
 
