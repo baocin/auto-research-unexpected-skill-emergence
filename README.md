@@ -8,6 +8,8 @@ An autonomous overnight research experiment investigating whether the emergent p
 
 ## Setup
 
+The project was bootstrapped by cloning [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) and removing its `.git` directory to start fresh. The original autoresearch code (designed for GPU-based neural network optimization) is preserved in `autoresearch/` as reference. All new experiment infrastructure was built on top.
+
 The experiment was run entirely autonomously overnight on a local machine:
 
 - **Research agent**: Gemma 4 26B A4B IT (Q4_K_M) via LM Studio
