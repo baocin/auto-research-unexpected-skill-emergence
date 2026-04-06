@@ -1,0 +1,4 @@
+experiment: anomaly_damage_analysis
+decay_slope:-0.4860
+intercept:0.5920
+r_squared:0.9378

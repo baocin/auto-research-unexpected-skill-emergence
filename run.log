@@ -1,4 +1,6 @@
-experiment: k_means_sensor_damage
-damage:0.0 p:1.0000 t:0.001301
-damage:0.2 p:1.0000 t:0.001117
-damage:0.5 p:1.0000 t:0.001120
+experiment: anomaly_detection_sensor_damage_v2
+damage:0.0 precision:0.5500 recall:0.5500 time:0.000624
+damage:0.2 precision:0.5160 recall:0.5160 time:0.000056
+damage:0.4 precision:0.4380 recall:0.4380 time:0.000055
+damage:0.6 precision:0.3240 recall:0.3240 time:0.000054
+damage:0.8 precision:0.1600 recall:0.1600 time:0.000054
